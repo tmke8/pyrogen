@@ -1,0 +1,20 @@
+[package]
+name = "pyrogen_cli"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+#authors.workspace = true
+#homepage.workspace = true
+#documentation.workspace = true
+#repository.workspace = true
+#license.workspace = true
+readme = "../../README.md"
+
+[[bin]]
+name = "pyrogen"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+pyrogen_parser = { path = "../pyrogen_parser" }

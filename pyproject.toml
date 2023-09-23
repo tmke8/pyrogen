@@ -1,0 +1,25 @@
+[build-system]
+requires = ["maturin>=1.2,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "pyrogen"
+version = "0.1.0"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+
+[project.urls]
+Repository = "https://github.com/tmke8/pyrogen"
+
+[tool.maturin]
+bindings = "bin"
+manifest-path = "crates/pyrogen_cli/Cargo.toml"
+module-name = "pyrogen"
+python-source = "python"
+strip = true
