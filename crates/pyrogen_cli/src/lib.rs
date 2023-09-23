@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use pyrogen_parser;
+use pyrogen_parser::{self, parser_test};
 
 use clap::Parser;
 
@@ -10,6 +10,7 @@ pub fn print_message() {
         "Hello, world! {num} plus one is {}!",
         pyrogen_parser::add_one(num)
     );
+    parser_test();
 }
 
 /// Pyrogen: a Python type checker
