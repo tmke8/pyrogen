@@ -1,0 +1,3 @@
+[tool.pyrogen]
+exclude = ["examples/excluded"]
+cache-dir = ".checker_cache"

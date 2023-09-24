@@ -1,0 +1,15 @@
+[package]
+name = "pyrogen_source_file"
+publish = false
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+pyrogen_text_size = { path = "../pyrogen_text_size" }
+
+memchr = { workspace = true }

@@ -1,8 +1,11 @@
 use std::path::PathBuf;
 
+use anyhow::Result;
 use pyrogen_parser::{self, parser_test};
 
 use clap::Parser;
+use pyrogen_workspace::pyproject::{find_settings_toml, parse_pyproject_toml};
+use pyrogen_workspace::resolver::python_files_in_path;
 
 pub fn print_message() {
     let num = 10;
@@ -25,10 +28,15 @@ struct Args {
     strict: bool,
 }
 
-pub fn parse_args() {
+pub fn parse_args() -> Result<()> {
     let args = Args::parse();
 
     if args.strict {
         println!("Hello {:?}!", args.files)
+    }
+    let path = find_settings_toml(&args.files[0])?;
+    if let Some(pyp_path) = path {
+        let pyproject = parse_pyproject_toml(pyp_path)?;
+        python_files_in_path(&args.files, pyproject);
     }
 }

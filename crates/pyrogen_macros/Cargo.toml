@@ -1,0 +1,25 @@
+[package]
+name = "pyrogen_macros"
+publish = false
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+proc-macro = true
+doctest = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+
+[dependencies]
+pyrogen_python_trivia = { path = "../pyrogen_python_trivia" }
+
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true, features = [
+    "derive",
+    "parsing",
+    "extra-traits",
+    "full",
+] }

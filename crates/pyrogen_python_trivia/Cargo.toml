@@ -1,0 +1,13 @@
+[package]
+name = "pyrogen_python_trivia"
+publish = false
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+pyrogen_source_file = { path = "../pyrogen_source_file" }

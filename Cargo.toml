@@ -9,3 +9,22 @@ rust-version = "1.71"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace.dependencies]
+anyhow = { version = "1.0.75" }
+colored = { version = "2.0.4" }
+glob = { version = "0.3.1" }
+globset = { version = "0.4.13" }
+ignore = { version = "0.4.20" }
+itertools = { version = "0.11.0" }
+log = { version = "0.4.20" }
+memchr = { version = "2.6.3" }
+path-absolutize = { version = "3.1.1" }
+proc-macro2 = { version = "1.0.67" }
+quote = { version = "1.0.33" }
+regex = { version = "1.9.5" }
+rustc-hash = { version = "1.1.0" }
+serde = { version = "1.0.188", features = ["derive"] }
+strum = { version = "0.25.0", features = ["strum_macros"] }
+strum_macros = { version = "0.25.2" }
+syn = { version = "2.0.37" }
+toml = { version = "0.8.0" }
+shellexpand = { version = "3.1.0" }

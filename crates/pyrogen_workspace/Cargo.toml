@@ -1,0 +1,32 @@
+[package]
+name = "pyrogen_workspace"
+version = "0.1.0"
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+
+[dependencies]
+pyrogen_checker = { path = "../pyrogen_checker" }
+pyrogen_macros = { path = "../pyrogen_macros" }
+pyrogen_cache = { path = "../pyrogen_cache" }
+
+anyhow = { workspace = true }
+dirs = "5.0.0"
+globset = { workspace = true }
+ignore = { workspace = true }
+itertools = { workspace = true }
+log = { workspace = true }
+path-absolutize = { workspace = true }
+pep440_rs = { version = "0.3.1", features = ["serde"] }
+rustc-hash = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }
+shellexpand = { workspace = true }
+glob = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3.8.0"
