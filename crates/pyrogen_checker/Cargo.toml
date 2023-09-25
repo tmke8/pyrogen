@@ -10,6 +10,7 @@ rust-version.workspace = true
 pyrogen_macros = { path = "../pyrogen_macros" }
 pyrogen_cache = { path = "../pyrogen_cache" }
 
+clap = { workspace = true, features = ["derive", "string"], optional = true }
 serde = { workspace = true }
 anyhow = { workspace = true }
 pep440_rs = { version = "0.3.1", features = ["serde"] }
@@ -21,5 +22,7 @@ path-absolutize = { workspace = true, features = [
     "once_cell_cache",
     "use_unix_paths_on_wasm",
 ] }
-pathdiff = "0.2.1"
+pathdiff = { version = "0.2.1" }
 colored = { workspace = true }
+chrono = { workspace = true }
+fern = { version = "0.6.2" }

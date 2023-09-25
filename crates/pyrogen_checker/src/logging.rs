@@ -1,3 +1,8 @@
+use anyhow::Result;
+use colored::Colorize;
+use fern;
+use log::Level;
+
 /// Warn a user once, with uniqueness determined by the calling location itself.
 #[macro_export]
 macro_rules! warn_user_once {
@@ -11,4 +16,66 @@ macro_rules! warn_user_once {
             warn!("{}", message.bold());
         }
     };
+}
+
+#[derive(Debug, Default, PartialOrd, Ord, PartialEq, Eq, Copy, Clone)]
+pub enum LogLevel {
+    /// No output ([`log::LevelFilter::Off`]).
+    Silent,
+    /// Only show lint violations, with no decorative output
+    /// ([`log::LevelFilter::Off`]).
+    Quiet,
+    /// All user-facing output ([`log::LevelFilter::Info`]).
+    #[default]
+    Default,
+    /// All user-facing output ([`log::LevelFilter::Debug`]).
+    Verbose,
+}
+
+impl LogLevel {
+    #[allow(clippy::trivially_copy_pass_by_ref)]
+    const fn level_filter(&self) -> log::LevelFilter {
+        match self {
+            LogLevel::Default => log::LevelFilter::Info,
+            LogLevel::Verbose => log::LevelFilter::Debug,
+            LogLevel::Quiet => log::LevelFilter::Off,
+            LogLevel::Silent => log::LevelFilter::Off,
+        }
+    }
+}
+
+pub fn set_up_logging(level: &LogLevel) -> Result<()> {
+    fern::Dispatch::new()
+        .format(|out, message, record| match record.level() {
+            Level::Error => {
+                out.finish(format_args!(
+                    "{}{} {}",
+                    "error".red().bold(),
+                    ":".bold(),
+                    message
+                ));
+            }
+            Level::Warn => {
+                out.finish(format_args!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    message
+                ));
+            }
+            Level::Info | Level::Debug | Level::Trace => {
+                out.finish(format_args!(
+                    "{}[{}][{}] {}",
+                    chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
+                    record.target(),
+                    record.level(),
+                    message
+                ));
+            }
+        })
+        .level(level.level_filter())
+        .level_for("globset", log::LevelFilter::Warn)
+        .chain(std::io::stderr())
+        .apply()?;
+    Ok(())
 }

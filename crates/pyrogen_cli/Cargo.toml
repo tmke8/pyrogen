@@ -19,6 +19,15 @@ name = "pyrogen"
 [dependencies]
 pyrogen_parser = { path = "../pyrogen_parser" }
 pyrogen_workspace = { path = "../pyrogen_workspace" }
+pyrogen_checker = { path = "../pyrogen_checker", features = ["clap"] }
 
-clap = { version = "4.4.4", features = ["derive"] }
+clap = { workspace = true, features = ["derive", "env"] }
 anyhow = { workspace = true }
+rustc-hash = { workspace = true }
+colored = { workspace = true }
+log = { workspace = true }
+path-absolutize = { workspace = true, features = ["once_cell_cache"] }
+shellexpand = { workspace = true }
+itertools = { workspace = true }
+argfile = { version = "0.1.6" }
+wild = "2.2.0"

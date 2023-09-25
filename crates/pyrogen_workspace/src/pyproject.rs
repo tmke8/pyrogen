@@ -45,7 +45,7 @@ impl Pyproject {
 // }
 
 /// Parse a `pyproject.toml` file.
-pub fn parse_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Pyproject> {
+fn parse_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Pyproject> {
     let contents = std::fs::read_to_string(path)?;
     toml::from_str(&contents).map_err(Into::into)
 }
