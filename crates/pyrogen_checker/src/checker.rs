@@ -24,7 +24,6 @@ use crate::checkers::noqa::check_noqa;
 use crate::checkers::physical_lines::check_physical_lines;
 use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
-use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::logging::DisplayParseError;
 use crate::message::Message;
 use crate::registry::{AsRule, Rule};
@@ -116,7 +115,7 @@ pub fn check_path(
             .rules
             .iter_enabled()
             .any(|rule_code| rule_code.lint_source().is_imports());
-    if use_ast || use_imports || use_doc_lines {
+    if use_ast || use_imports {
         match rustpython_parser::parse_tokens(
             tokens,
             source_type.as_mode(),
@@ -151,9 +150,6 @@ pub fn check_path(
                     imports = module_imports;
                     diagnostics.extend(import_diagnostics);
                 }
-                if use_doc_lines {
-                    doc_lines.extend(doc_lines_from_ast(&python_ast, locator));
-                }
             }
             Err(parse_error) => {
                 // Always add a diagnostic for the syntax error, regardless of whether
@@ -167,19 +163,13 @@ pub fn check_path(
         }
     }
 
-    // Deduplicate and reorder any doc lines.
-    if use_doc_lines {
-        doc_lines.sort_unstable();
-        doc_lines.dedup();
-    }
-
     // Run the lines-based rules.
     if settings
         .rules
         .iter_enabled()
         .any(|rule_code| rule_code.lint_source().is_physical_lines())
     {
-        diagnostics.extend(check_physical_lines(locator, indexer, &doc_lines, settings));
+        diagnostics.extend(check_physical_lines(locator, indexer, settings));
     }
 
     // Ignore diagnostics based on per-file-ignores.
@@ -245,7 +235,8 @@ pub fn lint_only(
 ) -> LinterResult<(Vec<Message>, Option<ImportMap>)> {
     // Tokenize once.
     // type Tokens = impl Iterator<Item = LexResult>;
-    let tokens = rustpython_parser::lexer::lex(source_kind.source_code(), source_type.as_mode());
+    let tokens = rustpython_parser::lexer::lex(source_kind.source_code(), source_type.as_mode())
+        .collect::<Vec<_>>();
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(source_kind.source_code());
@@ -317,59 +308,4 @@ fn collect_rule_codes(rules: impl IntoIterator<Item = Rule>) -> String {
         .sorted_unstable()
         .dedup()
         .join(", ")
-}
-
-#[cfg(test)]
-mod tests {
-    use std::path::Path;
-
-    use anyhow::Result;
-    use test_case::test_case;
-
-    use crate::registry::Rule;
-    use crate::test::test_contents;
-    use crate::{assert_messages, settings};
-
-    /// Construct a path to a Jupyter notebook in the `resources/test/fixtures/jupyter` directory.
-    fn notebook_path(path: impl AsRef<Path>) -> std::path::PathBuf {
-        Path::new("../ruff_notebook/resources/test/fixtures/jupyter").join(path)
-    }
-
-    #[test_case(Path::new("before_fix.ipynb"), true; "trailing_newline")]
-    #[test_case(Path::new("no_trailing_newline.ipynb"), false; "no_trailing_newline")]
-    fn test_trailing_newline(path: &Path, trailing_newline: bool) -> Result<()> {
-        let notebook = Notebook::from_path(&notebook_path(path))?;
-        assert_eq!(notebook.trailing_newline(), trailing_newline);
-
-        let mut writer = Vec::new();
-        notebook.write(&mut writer)?;
-        let string = String::from_utf8(writer)?;
-        assert_eq!(string.ends_with('\n'), trailing_newline);
-
-        Ok(())
-    }
-
-    // Version <4.5, don't emit cell ids
-    #[test_case(Path::new("no_cell_id.ipynb"), false; "no_cell_id")]
-    // Version 4.5, cell ids are missing and need to be added
-    #[test_case(Path::new("add_missing_cell_id.ipynb"), true; "add_missing_cell_id")]
-    fn test_cell_id(path: &Path, has_id: bool) -> Result<()> {
-        let source_notebook = Notebook::from_path(&notebook_path(path))?;
-        let source_kind = SourceKind::IpyNotebook(source_notebook);
-        let (_, transformed) = test_contents(
-            &source_kind,
-            path,
-            &settings::CheckerSettings::for_rule(Rule::UnusedImport),
-        );
-        let linted_notebook = transformed.into_owned().expect_ipy_notebook();
-        let mut writer = Vec::new();
-        linted_notebook.write(&mut writer)?;
-        let actual = String::from_utf8(writer)?;
-        if has_id {
-            assert!(actual.contains(r#""id": ""#));
-        } else {
-            assert!(!actual.contains(r#""id":"#));
-        }
-        Ok(())
-    }
 }

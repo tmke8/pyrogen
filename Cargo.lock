@@ -1047,6 +1047,7 @@ name = "pyrogen_cache"
 version = "0.1.0"
 dependencies = [
  "glob",
+ "globset",
  "itertools 0.11.0",
  "regex",
  "seahash",

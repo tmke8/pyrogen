@@ -12,7 +12,7 @@ pub struct CommentRangesBuilder {
 
 impl CommentRangesBuilder {
     pub fn visit_token(&mut self, token: &Tok, range: TextRange) {
-        if let Tok::Comment(_) = token {
+        if let Tok::Comment(..) = token {
             self.ranges.push(range);
         }
     }

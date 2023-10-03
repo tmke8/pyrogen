@@ -4,7 +4,7 @@ pub use cache_key::{CacheKey, CacheKeyHasher};
 
 mod cache_key;
 // pub mod filetime;
-// pub mod globset;
+pub mod globset;
 
 pub const CACHE_DIR_NAME: &str = ".pyrogen_cache";
 

@@ -263,7 +263,7 @@ if True:
 "#
         .trim();
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
+        let indexer = Indexer::from_tokens(&lxr, &Locator::new(contents));
         assert_eq!(
             indexer.continuation_line_starts(),
             [
@@ -295,7 +295,7 @@ import os
 "
         .trim();
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
+        let indexer = Indexer::from_tokens(&lxr, &Locator::new(contents));
         assert_eq!(
             indexer.continuation_line_starts(),
             [

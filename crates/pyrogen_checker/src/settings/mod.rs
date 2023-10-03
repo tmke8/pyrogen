@@ -1,6 +1,10 @@
 use std::path::{Path, PathBuf};
 
-use crate::{registry::Rule, settings::types::PythonVersion};
+use crate::{
+    registry::{Rule, RuleSet},
+    settings::types::PythonVersion,
+};
+use globset::GlobMatcher;
 use path_absolutize::path_dedot;
 use pyrogen_macros::CacheKey;
 
@@ -14,6 +18,7 @@ pub mod types;
 pub struct CheckerSettings {
     pub project_root: PathBuf,
     pub rules: RuleTable,
+    pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, RuleSet)>,
 
     pub target_version: PythonVersion,
     pub namespace_packages: Vec<PathBuf>,
@@ -27,6 +32,7 @@ impl CheckerSettings {
             project_root: project_root.to_path_buf(),
             rules: RuleTable::from_iter(vec![Rule::SyntaxError].into_iter()),
             namespace_packages: vec![],
+            per_file_ignores: vec![],
 
             src: vec![path_dedot::CWD.clone()],
         }
