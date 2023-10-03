@@ -9,6 +9,10 @@ rust-version.workspace = true
 [dependencies]
 pyrogen_macros = { path = "../pyrogen_macros" }
 pyrogen_cache = { path = "../pyrogen_cache" }
+pyrogen_source_file = { path = "../pyrogen_source_file", features = ["serde"] }
+pyrogen_diagnostics = { path = "../pyrogen_diagnostics" }
+pyrogen_python_ast = { path = "../pyrogen_python_ast" }
+pyrogen_python_index = { path = "../pyrogen_python_index" }
 
 clap = { workspace = true, features = ["derive", "string"], optional = true }
 serde = { workspace = true }
@@ -25,4 +29,19 @@ path-absolutize = { workspace = true, features = [
 pathdiff = { version = "0.2.1" }
 colored = { workspace = true }
 chrono = { workspace = true }
+bitflags = { workspace = true }
 fern = { version = "0.6.2" }
+annotate-snippets = { version = "0.9.1", features = ["color"] }
+similar = { workspace = true }
+rustc-hash = { workspace = true }
+is-macro = { workspace = true }
+thiserror = { workspace = true }
+unicode-width = { workspace = true }
+result-like = "0.4.6"
+rustpython-parser = { workspace = true }
+itertools = { workspace = true }
+once_cell = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }
+test-case = { workspace = true }

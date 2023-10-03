@@ -158,3 +158,17 @@ impl CacheKey for FilePatternSet {
         state.write_u64(self.cache_key);
     }
 }
+
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug, Hash)]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
+#[serde(rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum SerializationFormat {
+    Text,
+}
+
+impl Default for SerializationFormat {
+    fn default() -> Self {
+        Self::Text
+    }
+}

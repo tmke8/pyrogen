@@ -20,14 +20,31 @@ name = "pyrogen"
 pyrogen_parser = { path = "../pyrogen_parser" }
 pyrogen_workspace = { path = "../pyrogen_workspace" }
 pyrogen_checker = { path = "../pyrogen_checker", features = ["clap"] }
+pyrogen_diagnostics = { path = "../pyrogen_diagnostics" }
+pyrogen_macros = { path = "../pyrogen_macros" }
+pyrogen_source_file = { path = "../pyrogen_source_file" }
+pyrogen_python_ast = { path = "../pyrogen_python_ast" }
 
-clap = { workspace = true, features = ["derive", "env"] }
 anyhow = { workspace = true }
-rustc-hash = { workspace = true }
+argfile = { version = "0.1.6" }
+bitflags = { workspace = true }
+clap = { workspace = true, features = ["derive", "env"] }
 colored = { workspace = true }
+filetime = { workspace = true }
+ignore = { workspace = true }
+itertools = { workspace = true }
 log = { workspace = true }
 path-absolutize = { workspace = true, features = ["once_cell_cache"] }
+rayon = { version = "1.8.0" }
+rustc-hash = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 shellexpand = { workspace = true }
-itertools = { workspace = true }
-argfile = { version = "0.1.6" }
-wild = "2.2.0"
+similar = { workspace = true }
+thiserror = { workspace = true }
+wild = { version = "2.2.0" }
+clearscreen = "2.0.0"
+
+[dev-dependencies]
+insta = { workspace = true, features = ["filters"] }
+tempfile = "3.8.0"

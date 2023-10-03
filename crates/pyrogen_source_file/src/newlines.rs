@@ -1,8 +1,9 @@
+use rustpython_parser::text_size::{TextRange, TextSize};
 use std::iter::FusedIterator;
 use std::ops::Deref;
 
 use memchr::{memchr2, memrchr2};
-use pyrogen_text_size::{TextLen, TextRange, TextSize};
+use rustpython_parser::text_size::TextLen;
 
 /// Extension trait for [`str`] that provides a [`UniversalNewlineIterator`].
 pub trait UniversalNewlines {
@@ -345,7 +346,7 @@ impl Deref for LineEnding {
 
 #[cfg(test)]
 mod tests {
-    use pyrogen_text_size::TextSize;
+    use rustpython_parser::text_size::TextSize;
 
     use super::{Line, UniversalNewlineIterator};
 

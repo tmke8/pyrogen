@@ -1,5 +1,6 @@
 [package]
-name = "pyrogen_text_size"
+name = "pyrogen_python_ast"
+publish = false
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
@@ -7,3 +8,7 @@ rust-version.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+
+is-macro = { workspace = true }
+rustc-hash = { workspace = true }
+rustpython-parser = { workspace = true }

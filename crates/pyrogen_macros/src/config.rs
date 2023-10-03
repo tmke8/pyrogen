@@ -93,13 +93,13 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenS
         }
         _ => Err(syn::Error::new(
             ident.span(),
-            "Can only derive ConfigurationOptions from structs with named fields.",
+            "Can only derive OptionsMetadata from structs with named fields.",
         )),
     }
 }
 
 /// For a field with type `Option<Foobar>` where `Foobar` itself is a struct
-/// deriving `ConfigurationOptions`, create code that calls retrieves options
+/// deriving `OptionsMetadata`, create code that calls retrieves options
 /// from that group: `Foobar::get_available_options()`
 fn handle_option_group(field: &Field) -> syn::Result<proc_macro2::TokenStream> {
     let ident = field

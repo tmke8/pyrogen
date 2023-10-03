@@ -10,23 +10,39 @@ rust-version = "1.71"
 
 [workspace.dependencies]
 anyhow = { version = "1.0.75" }
+bitflags = { version = "2.3.1" }
+chrono = { version = "0.4.31" }
+clap = { version = "4.4.4" }
 colored = { version = "2.0.4" }
+filetime = "0.2.20"
 glob = { version = "0.3.1" }
 globset = { version = "0.4.13" }
 ignore = { version = "0.4.20" }
+insta = { version = "1.32.0", features = ["filters", "glob"] }
+is-macro = { version = "0.3.0" }
 itertools = { version = "0.11.0" }
 log = { version = "0.4.20" }
 memchr = { version = "2.6.3" }
+once_cell = { version = "1.17.1" }
 path-absolutize = { version = "3.1.1" }
 proc-macro2 = { version = "1.0.67" }
 quote = { version = "1.0.33" }
 regex = { version = "1.9.5" }
 rustc-hash = { version = "1.1.0" }
 serde = { version = "1.0.188", features = ["derive"] }
+serde_json = { version = "1.0.107" }
+shellexpand = { version = "3.1.0" }
+similar = { version = "2.2.1", features = ["inline"] }
 strum = { version = "0.25.0", features = ["strum_macros"] }
 strum_macros = { version = "0.25.2" }
 syn = { version = "2.0.37" }
+thiserror = { version = "1.0.48" }
 toml = { version = "0.8.0" }
-shellexpand = { version = "3.1.0" }
-clap = { version = "4.4.4" }
-chrono = { version = "0.4.31" }
+unicode-width = { version = "0.1.11" }
+rustpython-parser = { version = "0.3.0", features = [
+    "full-lexer",
+    "location",
+    "malachite-bigint",
+    "all-nodes-with-ranges",
+] }
+test-case = { version = "3.2.1" }

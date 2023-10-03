@@ -14,8 +14,12 @@ use pyrogen_parser::{self, parser_test};
 use pyrogen_workspace::resolver::python_files_in_path;
 
 use crate::args::{Args, CheckCommand};
+use crate::printer::{Flags as PrinterFlags, Printer};
 
 pub mod args;
+mod commands;
+mod diagnostics;
+mod printer;
 pub mod resolve;
 
 pub fn print_message() {
@@ -166,6 +170,47 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         .sorted_by(|a, b| a.path().cmp(b.path()))
     {
         writeln!(writer, "{}", entry.path().to_string_lossy())?;
+    }
+
+    let printer = Printer::new(output_format, log_level, autofix, printer_flags);
+
+    let is_stdin = is_stdin(&cli.files, cli.stdin_filename.as_deref());
+
+    // Generate lint violations.
+    let diagnostics = if is_stdin {
+        commands::check_stdin::check_stdin(
+            cli.stdin_filename.map(fs::normalize_path).as_deref(),
+            &pyproject_config,
+            &overrides,
+            noqa.into(),
+            autofix,
+        )?
+    } else {
+        commands::check::check(
+            &cli.files,
+            &pyproject_config,
+            &overrides,
+            cache.into(),
+            noqa.into(),
+            autofix,
+        )?
+    };
+
+    // Always try to print violations (the printer itself may suppress output),
+    // unless we're writing fixes via stdin (in which case, the transformed
+    // source code goes to stdout).
+    if !(is_stdin && matches!(autofix, flags::FixMode::Apply | flags::FixMode::Diff)) {
+        if cli.statistics {
+            printer.write_statistics(&diagnostics, &mut writer)?;
+        } else {
+            printer.write_once(&diagnostics, &mut writer)?;
+        }
+    }
+
+    if !cli.exit_zero {
+        if !diagnostics.messages.is_empty() {
+            return Ok(ExitStatus::Failure);
+        }
     }
 
     Ok(ExitStatus::Success)

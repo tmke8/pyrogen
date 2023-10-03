@@ -1,9 +1,9 @@
-use pyrogen_macros::ConfigurationOptions;
+use pyrogen_macros::OptionsMetadata;
 use serde::{Deserialize, Serialize};
 
 use pyrogen_checker::settings::types::PythonVersion;
 
-#[derive(Debug, PartialEq, Eq, Default, ConfigurationOptions, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {
