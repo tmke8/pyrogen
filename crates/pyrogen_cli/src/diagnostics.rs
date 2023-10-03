@@ -13,10 +13,12 @@ use colored::Colorize;
 use filetime::FileTime;
 use log::{debug, error, warn};
 use rustc_hash::FxHashMap;
+use rustpython_parser::ast::Ranged;
+use rustpython_parser::text_size::TextRange;
 use similar::TextDiff;
 use thiserror::Error;
 
-use pyrogen_checker::checker::{lint_fix, lint_only, FixTable, FixerResult, LinterResult};
+use pyrogen_checker::checker::{lint_only, FixTable, FixerResult, LinterResult};
 use pyrogen_checker::logging::DisplayParseError;
 use pyrogen_checker::message::Message;
 use pyrogen_checker::pyproject_toml::lint_pyproject_toml;
@@ -30,8 +32,6 @@ use pyrogen_python_ast::imports::ImportMap;
 use pyrogen_python_ast::{PySourceType, SourceType, TomlSourceType};
 use pyrogen_source_file::{LineIndex, SourceCode, SourceFileBuilder};
 use pyrogen_workspace::Settings;
-use rustpython_parser::ast::Ranged;
-use rustpython_parser::text_size::TextRange;
 
 use crate::cache::Cache;
 
@@ -142,11 +142,6 @@ pub(crate) fn lint_path(
     autofix: flags::FixMode,
 ) -> Result<Diagnostics> {
     // Check the cache.
-    // TODO(charlie): `fixer::Mode::Apply` and `fixer::Mode::Diff` both have
-    // side-effects that aren't captured in the cache. (In practice, it's fine
-    // to cache `fixer::Mode::Apply`, since a file either has no fixes, or we'll
-    // write the fixes to disk, thus invalidating the cache. But it's a bit hard
-    // to reason about. We need to come up with a better solution here.)
     let caching = match cache {
         Some(cache) if noqa.into() && autofix.is_generate() => {
             let relative_path = cache
@@ -212,40 +207,7 @@ pub(crate) fn lint_path(
             error: parse_error,
         },
         fixed,
-    ) = if matches!(autofix, flags::FixMode::Apply | flags::FixMode::Diff) {
-        if let Ok(FixerResult {
-            result,
-            transformed,
-            fixed,
-        }) = lint_fix(path, package, noqa, settings, &source_kind, source_type)
-        {
-            if !fixed.is_empty() {
-                match autofix {
-                    flags::FixMode::Apply => {
-                        let SourceKind(source_code) = transformed.as_ref();
-                        write(path, source_code.as_bytes())?;
-                    }
-                    flags::FixMode::Diff => {
-                        let SourceKind(source_code) = transformed.as_ref();
-                        let mut stdout = io::stdout().lock();
-                        TextDiff::from_lines(source_kind.source_code(), source_code)
-                            .unified_diff()
-                            .header(&fs::relativize_path(path), &fs::relativize_path(path))
-                            .to_writer(&mut stdout)?;
-                        stdout.write_all(b"\n")?;
-                        stdout.flush()?;
-                    }
-                    flags::FixMode::Generate => {}
-                }
-            }
-            (result, fixed)
-        } else {
-            // If we fail to autofix, lint the original source code.
-            let result = lint_only(path, package, settings, noqa, &source_kind, source_type);
-            let fixed = FxHashMap::default();
-            (result, fixed)
-        }
-    } else {
+    ) = {
         let result = lint_only(path, package, settings, noqa, &source_kind, source_type);
         let fixed = FxHashMap::default();
         (result, fixed)
@@ -313,66 +275,6 @@ pub(crate) fn lint_stdin(
         },
         fixed,
     ) = if matches!(autofix, flags::FixMode::Apply | flags::FixMode::Diff) {
-        if let Ok(FixerResult {
-            result,
-            transformed,
-            fixed,
-        }) = lint_fix(
-            path.unwrap_or_else(|| Path::new("-")),
-            package,
-            noqa,
-            &settings.linter,
-            &source_kind,
-            source_type,
-        ) {
-            match autofix {
-                flags::FixMode::Apply => {
-                    // Write the contents to stdout, regardless of whether any errors were fixed.
-                    io::stdout().write_all(transformed.source_code().as_bytes())?;
-                }
-                flags::FixMode::Diff => {
-                    // But only write a diff if it's non-empty.
-                    if !fixed.is_empty() {
-                        let text_diff = TextDiff::from_lines(
-                            source_kind.source_code(),
-                            transformed.source_code(),
-                        );
-                        let mut unified_diff = text_diff.unified_diff();
-                        if let Some(path) = path {
-                            unified_diff
-                                .header(&fs::relativize_path(path), &fs::relativize_path(path));
-                        }
-
-                        let mut stdout = io::stdout().lock();
-                        unified_diff.to_writer(&mut stdout)?;
-                        stdout.write_all(b"\n")?;
-                        stdout.flush()?;
-                    }
-                }
-                flags::FixMode::Generate => {}
-            }
-
-            (result, fixed)
-        } else {
-            // If we fail to autofix, lint the original source code.
-            let result = lint_only(
-                path.unwrap_or_else(|| Path::new("-")),
-                package,
-                &settings.linter,
-                noqa,
-                &source_kind,
-                source_type,
-            );
-            let fixed = FxHashMap::default();
-
-            // Write the contents to stdout anyway.
-            if autofix.is_apply() {
-                io::stdout().write_all(source_kind.source_code().as_bytes())?;
-            }
-
-            (result, fixed)
-        }
-    } else {
         let result = lint_only(
             path.unwrap_or_else(|| Path::new("-")),
             package,
