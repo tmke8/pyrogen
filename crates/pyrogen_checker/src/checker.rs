@@ -21,8 +21,6 @@ use crate::checkers::ast::check_ast;
 use crate::checkers::filesystem::check_file_path;
 use crate::checkers::imports::check_imports;
 use crate::checkers::noqa::check_noqa;
-use crate::checkers::physical_lines::check_physical_lines;
-use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
 use crate::logging::DisplayParseError;
 use crate::message::Message;
@@ -80,22 +78,6 @@ pub fn check_path(
     let mut imports = None;
     let mut error = None;
 
-    // Run the token-based rules.
-    if settings
-        .rules
-        .iter_enabled()
-        .any(|rule_code| rule_code.lint_source().is_tokens())
-    {
-        diagnostics.extend(check_tokens(
-            &tokens,
-            path,
-            locator,
-            indexer,
-            settings,
-            source_type.is_stub(),
-        ));
-    }
-
     // Run the filesystem-based rules.
     if settings
         .rules
@@ -106,70 +88,42 @@ pub fn check_path(
     }
 
     // Run the AST-based rules.
-    let use_ast = settings
-        .rules
-        .iter_enabled()
-        .any(|rule_code| rule_code.lint_source().is_ast());
-    let use_imports = !directives.isort.skip_file
-        && settings
-            .rules
-            .iter_enabled()
-            .any(|rule_code| rule_code.lint_source().is_imports());
-    if use_ast || use_imports {
-        match rustpython_parser::parse_tokens(
-            tokens,
-            source_type.as_mode(),
-            &path.to_string_lossy(),
-        ) {
-            Ok(python_ast) => {
-                if use_ast {
-                    diagnostics.extend(check_ast(
-                        &python_ast,
-                        locator,
-                        indexer,
-                        &directives.noqa_line_for,
-                        settings,
-                        noqa,
-                        path,
-                        package,
-                        source_type,
-                    ));
-                }
-                if use_imports {
-                    let (import_diagnostics, module_imports) = check_imports(
-                        &python_ast,
-                        locator,
-                        indexer,
-                        &directives.isort,
-                        settings,
-                        path,
-                        package,
-                        source_kind,
-                        source_type,
-                    );
-                    imports = module_imports;
-                    diagnostics.extend(import_diagnostics);
-                }
-            }
-            Err(parse_error) => {
-                // Always add a diagnostic for the syntax error, regardless of whether
-                // `Rule::SyntaxError` is enabled. We avoid propagating the syntax error
-                // if it's disabled via any of the usual mechanisms (e.g., `noqa`,
-                // `per-file-ignores`), and the easiest way to detect that suppression is
-                // to see if the diagnostic persists to the end of the function.
-                pycodestyle::rules::syntax_error(&mut diagnostics, &parse_error, locator);
-                error = Some(parse_error);
-            }
+    match rustpython_parser::parse_tokens(tokens, source_type.as_mode(), &path.to_string_lossy()) {
+        Ok(python_ast) => {
+            diagnostics.extend(check_ast(
+                &python_ast,
+                locator,
+                indexer,
+                &directives.noqa_line_for,
+                settings,
+                noqa,
+                path,
+                package,
+                source_type,
+            ));
+            let (import_diagnostics, module_imports) = check_imports(
+                &python_ast,
+                locator,
+                indexer,
+                &directives.isort,
+                settings,
+                path,
+                package,
+                source_kind,
+                source_type,
+            );
+            imports = module_imports;
+            diagnostics.extend(import_diagnostics);
         }
-    }
-
-    // Run the lines-based rules.
-    if settings
-        .rules
-        .iter_enabled()
-        .any(|rule_code| rule_code.lint_source().is_physical_lines())
-    {
-        diagnostics.extend(check_physical_lines(locator, indexer, settings));
+        Err(parse_error) => {
+            // Always add a diagnostic for the syntax error, regardless of whether
+            // `Rule::SyntaxError` is enabled. We avoid propagating the syntax error
+            // if it's disabled via any of the usual mechanisms (e.g., `noqa`,
+            // `per-file-ignores`), and the easiest way to detect that suppression is
+            // to see if the diagnostic persists to the end of the function.
+            pycodestyle::rules::syntax_error(&mut diagnostics, &parse_error, locator);
+            error = Some(parse_error);
+        }
     }
 
     // Ignore diagnostics based on per-file-ignores.
