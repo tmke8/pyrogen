@@ -9,7 +9,7 @@ use log::error;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Ranged;
 use rustpython_parser::lexer::LexResult;
-use rustpython_parser::ParseError;
+use rustpython_parser::{Parse, ParseError};
 
 use pyrogen_diagnostics::Diagnostic;
 use pyrogen_python_ast::imports::ImportMap;
@@ -17,10 +17,10 @@ use pyrogen_python_ast::{AsMode, PySourceType};
 use pyrogen_python_index::Indexer;
 use pyrogen_source_file::{Locator, SourceFileBuilder};
 
-use crate::checkers::ast::check_ast;
 use crate::checkers::filesystem::check_file_path;
 use crate::checkers::imports::check_imports;
-use crate::checkers::noqa::check_noqa;
+use crate::checkers::type_ignore::check_type_ignore;
+use crate::checkers::typecheck::check_ast;
 use crate::directives::Directives;
 use crate::logging::DisplayParseError;
 use crate::message::Message;
@@ -88,7 +88,11 @@ pub fn check_path(
     }
 
     // Run the AST-based rules.
-    match rustpython_parser::parse_tokens(tokens, source_type.as_mode(), &path.to_string_lossy()) {
+    match rustpython_ast::Suite::parse_tokens(
+        tokens,
+        // source_type.as_mode(),
+        &path.to_string_lossy(),
+    ) {
         Ok(python_ast) => {
             diagnostics.extend(check_ast(
                 &python_ast,
@@ -105,7 +109,6 @@ pub fn check_path(
                 &python_ast,
                 locator,
                 indexer,
-                &directives.isort,
                 settings,
                 path,
                 package,
@@ -121,7 +124,7 @@ pub fn check_path(
             // if it's disabled via any of the usual mechanisms (e.g., `noqa`,
             // `per-file-ignores`), and the easiest way to detect that suppression is
             // to see if the diagnostic persists to the end of the function.
-            pycodestyle::rules::syntax_error(&mut diagnostics, &parse_error, locator);
+            // pycodestyle::rules::syntax_error(&mut diagnostics, &parse_error, locator);
             error = Some(parse_error);
         }
     }
@@ -141,7 +144,7 @@ pub fn check_path(
             .iter_enabled()
             .any(|rule_code| rule_code.lint_source().is_noqa())
     {
-        let ignored = check_noqa(
+        let ignored = check_type_ignore(
             &mut diagnostics,
             path,
             locator,
@@ -199,12 +202,7 @@ pub fn lint_only(
     let indexer = Indexer::from_tokens(&tokens, &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
-    let directives = directives::extract_directives(
-        &tokens,
-        directives::Flags::from_settings(settings),
-        &locator,
-        &indexer,
-    );
+    let directives = directives::extract_directives(&tokens, &locator, &indexer);
 
     // Generate diagnostics.
     let result = check_path(

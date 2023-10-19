@@ -4,11 +4,12 @@ use crate::{
     registry::{Rule, RuleSet},
     settings::types::PythonVersion,
 };
-use globset::GlobMatcher;
+use anyhow::Result;
+use globset::{Glob, GlobMatcher};
 use path_absolutize::path_dedot;
 use pyrogen_macros::CacheKey;
 
-use self::rule_table::RuleTable;
+use self::{rule_table::RuleTable, types::PerFileIgnore};
 
 pub mod flags;
 pub mod rule_table;
@@ -43,4 +44,23 @@ impl CheckerSettings {
         self.target_version = target_version;
         self
     }
+}
+
+/// Given a list of patterns, create a `GlobSet`.
+pub fn resolve_per_file_ignores(
+    per_file_ignores: Vec<PerFileIgnore>,
+) -> Result<Vec<(GlobMatcher, GlobMatcher, RuleSet)>> {
+    per_file_ignores
+        .into_iter()
+        .map(|per_file_ignore| {
+            // Construct absolute path matcher.
+            let absolute =
+                Glob::new(&per_file_ignore.absolute.to_string_lossy())?.compile_matcher();
+
+            // Construct basename matcher.
+            let basename = Glob::new(&per_file_ignore.basename)?.compile_matcher();
+
+            Ok((absolute, basename, per_file_ignore.rules))
+        })
+        .collect()
 }

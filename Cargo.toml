@@ -39,6 +39,15 @@ syn = { version = "2.0.37" }
 thiserror = { version = "1.0.48" }
 toml = { version = "0.8.0" }
 unicode-width = { version = "0.1.11" }
+rustpython-ast = { version = "0.3.0", features = [
+    "all-nodes-with-ranges",
+    "location",
+    "malachite-bigint",
+    "fold",
+    "rustpython-literal",
+    "constant-optimization",
+    "visitor",
+] }
 rustpython-parser = { version = "0.3.0", features = [
     "full-lexer",
     "location",

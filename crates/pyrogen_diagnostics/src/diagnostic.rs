@@ -15,8 +15,6 @@ pub struct DiagnosticKind {
     pub name: String,
     /// The message body to display to the user, to explain the diagnostic.
     pub body: String,
-    /// The message to display to the user, to explain the suggested fix.
-    pub suggestion: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

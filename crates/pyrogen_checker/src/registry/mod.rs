@@ -9,7 +9,7 @@ pub use rule_set::{RuleSet, RuleSetIterator};
 mod rule_set;
 
 #[repr(u16)]
-#[derive(Debug, Clone, Copy, PartialEq, Display, EnumString, EnumIter, IntoStaticStr)] // strum macros.
+#[derive(Eq, Hash, Debug, Clone, Copy, PartialEq, Display, EnumString, EnumIter, IntoStaticStr)] // strum macros.
 pub enum Rule {
     InvalidPyprojectToml,
     #[strum(serialize = "override")]
@@ -32,6 +32,10 @@ pub trait AsRule {
 impl Rule {
     pub fn from_code(code: &str) -> Result<Self, FromCodeError> {
         code.to_owned().parse().map_err(|x| FromCodeError::Unknown)
+    }
+
+    pub fn code(&self) -> &'static str {
+        self.into()
     }
 }
 

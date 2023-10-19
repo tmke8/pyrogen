@@ -12,3 +12,4 @@ rust-version.workspace = true
 is-macro = { workspace = true }
 rustc-hash = { workspace = true }
 rustpython-parser = { workspace = true }
+rustpython-ast = { workspace = true }

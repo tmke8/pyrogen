@@ -4,9 +4,12 @@ use pyrogen_cache::cache_dir;
 use pyrogen_checker::{
     fs,
     settings::{
-        types::{FilePattern, FilePatternSet},
+        resolve_per_file_ignores,
+        rule_table::RuleTable,
+        types::{FilePattern, FilePatternSet, PerFileIgnore},
         CheckerSettings,
     },
+    RuleSelector,
 };
 use shellexpand::LookupError;
 use std::{
@@ -21,7 +24,15 @@ use crate::options::Options;
 use crate::settings::{FileResolverSettings, Settings, EXCLUDE, INCLUDE};
 
 #[derive(Debug, Default)]
+pub struct RuleSelection {
+    pub select: Option<Vec<RuleSelector>>,
+    pub ignore: Vec<RuleSelector>,
+}
+
+#[derive(Debug, Default)]
 pub struct Configuration {
+    pub rule_selections: Vec<RuleSelection>,
+    pub per_file_ignores: Option<Vec<PerFileIgnore>>,
     pub cache_dir: Option<PathBuf>,
     pub exclude: Option<Vec<FilePattern>>,
     pub force_exclude: Option<bool>,
@@ -35,6 +46,7 @@ pub struct Configuration {
 impl Configuration {
     pub fn into_settings(self, project_root: &Path) -> Result<Settings> {
         let target_version = self.target_version.unwrap_or_default();
+        let rules = self.as_rule_table();
 
         Ok(Settings {
             cache_dir: self
@@ -54,8 +66,15 @@ impl Configuration {
                 project_root: project_root.to_path_buf(),
             },
             checker: CheckerSettings {
-                target_version,
                 project_root: project_root.to_path_buf(),
+                rules: rules,
+                per_file_ignores: resolve_per_file_ignores(
+                    self.per_file_ignores
+                        .unwrap_or_default()
+                        .into_iter()
+                        .collect(),
+                )?,
+                target_version: target_version,
                 namespace_packages: self.namespace_packages.unwrap_or_default(),
                 src: self.src.unwrap_or_else(|| vec![project_root.to_path_buf()]),
             },
@@ -64,6 +83,18 @@ impl Configuration {
 
     pub fn from_options(options: Options, project_root: &Path) -> Result<Self> {
         Ok(Self {
+            rule_selections: vec![RuleSelection {
+                select: options.select,
+                ignore: options.ignore.into_iter().flatten().collect(),
+            }],
+            per_file_ignores: options.per_file_ignores.map(|per_file_ignores| {
+                per_file_ignores
+                    .into_iter()
+                    .map(|(pattern, prefixes)| {
+                        PerFileIgnore::new(pattern, &prefixes, Some(project_root))
+                    })
+                    .collect()
+            }),
             cache_dir: options
                 .cache_dir
                 .map(|dir| {
@@ -107,6 +138,12 @@ impl Configuration {
     #[must_use]
     pub fn combine(self, config: Self) -> Self {
         Self {
+            rule_selections: config
+                .rule_selections
+                .into_iter()
+                .chain(self.rule_selections)
+                .collect(),
+            per_file_ignores: self.per_file_ignores.or(config.per_file_ignores),
             cache_dir: self.cache_dir.or(config.cache_dir),
             exclude: self.exclude.or(config.exclude),
             force_exclude: self.force_exclude.or(config.force_exclude),
@@ -116,6 +153,10 @@ impl Configuration {
             src: self.src.or(config.src),
             target_version: self.target_version.or(config.target_version),
         }
+    }
+
+    pub fn as_rule_table(&self) -> RuleTable {
+        RuleTable::empty()
     }
 }
 

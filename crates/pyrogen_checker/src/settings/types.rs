@@ -1,4 +1,9 @@
-use std::{hash::Hasher, ops::Deref, path::PathBuf, str::FromStr};
+use std::{
+    hash::Hasher,
+    ops::Deref,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 use anyhow::Result;
 use globset::{Glob, GlobSet, GlobSetBuilder};
@@ -10,7 +15,7 @@ use strum_macros::EnumIter;
 use pyrogen_cache::{CacheKey, CacheKeyHasher};
 use pyrogen_macros::CacheKey;
 
-use crate::fs;
+use crate::{fs, registry::RuleSet, RuleSelector};
 
 #[derive(
     Clone,
@@ -156,6 +161,31 @@ impl CacheKey for FilePatternSet {
     fn cache_key(&self, state: &mut CacheKeyHasher) {
         state.write_usize(self.set.len());
         state.write_u64(self.cache_key);
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct PerFileIgnore {
+    pub(crate) basename: String,
+    pub(crate) absolute: PathBuf,
+    pub(crate) rules: RuleSet,
+}
+
+impl PerFileIgnore {
+    pub fn new(pattern: String, prefixes: &[RuleSelector], project_root: Option<&Path>) -> Self {
+        // Rules in preview are included here even if preview mode is disabled; it's safe to ignore disabled rules
+        let rules: RuleSet = prefixes.iter().flat_map(RuleSelector::all_rules).collect();
+        let path = Path::new(&pattern);
+        let absolute = match project_root {
+            Some(project_root) => fs::normalize_path_to(path, project_root),
+            None => fs::normalize_path(path),
+        };
+
+        Self {
+            basename: pattern,
+            absolute,
+            rules,
+        }
     }
 }
 

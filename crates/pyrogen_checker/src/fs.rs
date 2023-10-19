@@ -1,6 +1,43 @@
 use std::path::{Path, PathBuf};
 
+use globset::GlobMatcher;
+use log::debug;
 use path_absolutize::Absolutize;
+
+use crate::registry::RuleSet;
+
+/// Create a set with codes matching the pattern/code pairs.
+pub(crate) fn ignores_from_path(
+    path: &Path,
+    pattern_code_pairs: &[(GlobMatcher, GlobMatcher, RuleSet)],
+) -> RuleSet {
+    let file_name = path.file_name().expect("Unable to parse filename");
+    pattern_code_pairs
+        .iter()
+        .filter_map(|(absolute, basename, rules)| {
+            if basename.is_match(file_name) {
+                debug!(
+                    "Adding per-file ignores for {:?} due to basename match on {:?}: {:?}",
+                    path,
+                    basename.glob().regex(),
+                    rules
+                );
+                Some(rules)
+            } else if absolute.is_match(path) {
+                debug!(
+                    "Adding per-file ignores for {:?} due to absolute match on {:?}: {:?}",
+                    path,
+                    absolute.glob().regex(),
+                    rules
+                );
+                Some(rules)
+            } else {
+                None
+            }
+        })
+        .flatten()
+        .collect()
+}
 
 /// Convert any path to an absolute path (based on the current working
 /// directory).

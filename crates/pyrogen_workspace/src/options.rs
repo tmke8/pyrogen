@@ -1,7 +1,8 @@
 use pyrogen_macros::OptionsMetadata;
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
-use pyrogen_checker::settings::types::PythonVersion;
+use pyrogen_checker::{settings::types::PythonVersion, RuleSelector};
 
 #[derive(Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -23,6 +24,55 @@ pub struct Options {
         example = r#"cache-dir = "~/.cache/pyrogen""#
     )]
     pub cache_dir: Option<String>,
+
+    /// A list of rule codes or prefixes to ignore. Prefixes can specify exact
+    /// rules (like `F841`), entire categories (like `F`), or anything in
+    /// between.
+    ///
+    /// When breaking ties between enabled and disabled rules (via `select` and
+    /// `ignore`, respectively), more specific prefixes override less
+    /// specific prefixes.
+    #[option(
+        default = "[]",
+        value_type = "list[RuleSelector]",
+        example = r#"
+            # Skip unused variable rules (`F841`).
+            ignore = ["F841"]
+        "#
+    )]
+    pub ignore: Option<Vec<RuleSelector>>,
+
+    /// A list of rule codes or prefixes to enable. Prefixes can specify exact
+    /// rules (like `F841`), entire categories (like `F`), or anything in
+    /// between.
+    ///
+    /// When breaking ties between enabled and disabled rules (via `select` and
+    /// `ignore`, respectively), more specific prefixes override less
+    /// specific prefixes.
+    #[option(
+        default = r#"["E", "F"]"#,
+        value_type = "list[RuleSelector]",
+        example = r#"
+            # On top of the defaults (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
+            select = ["E", "F", "B", "Q"]
+        "#
+    )]
+    pub select: Option<Vec<RuleSelector>>,
+
+    // Tables are required to go last.
+    /// A list of mappings from file pattern to rule codes or prefixes to
+    /// exclude, when considering any matching files.
+    #[option(
+        default = "{}",
+        value_type = "dict[str, list[RuleSelector]]",
+        example = r#"
+            # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
+            [tool.ruff.per-file-ignores]
+            "__init__.py" = ["E402"]
+            "path/to/file.py" = ["E402"]
+        "#
+    )]
+    pub per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
 
     /// A list of file patterns to exclude from linting.
     ///

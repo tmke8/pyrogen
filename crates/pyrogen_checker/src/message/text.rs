@@ -119,16 +119,7 @@ impl Display for MessageCodeFrame<'_> {
             kind, file, range, ..
         } = self.message;
 
-        let suggestion = kind.suggestion.as_deref();
-        let footer = if suggestion.is_some() {
-            vec![Annotation {
-                id: None,
-                label: suggestion,
-                annotation_type: AnnotationType::Help,
-            }]
-        } else {
-            Vec::new()
-        };
+        let footer = Vec::new();
 
         let source_code = file.to_source_code();
 

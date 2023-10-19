@@ -264,4 +264,9 @@ impl TextRangeWrapper {
     pub const fn new(start: TextSize, end: TextSize) -> TextRangeWrapper {
         TextRangeWrapper(TextRange::new(start, end))
     }
+
+    #[inline]
+    pub const fn wrap(range: TextRange) -> TextRangeWrapper {
+        TextRangeWrapper(range)
+    }
 }

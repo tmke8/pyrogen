@@ -134,7 +134,6 @@ def fibonacci(n):
             DiagnosticKind {
                 name: "UnusedImport".to_string(),
                 body: "`os` imported but unused".to_string(),
-                suggestion: Some("Remove unused import: `os`".to_string()),
             },
             TextRange::new(TextSize::from(7), TextSize::from(9)),
         )
@@ -149,7 +148,6 @@ def fibonacci(n):
             DiagnosticKind {
                 name: "UnusedVariable".to_string(),
                 body: "Local variable `x` is assigned to but never used".to_string(),
-                suggestion: Some("Remove assignment to unused variable `x`".to_string()),
             },
             TextRange::new(TextSize::from(94), TextSize::from(95)),
         )
@@ -164,7 +162,6 @@ def fibonacci(n):
             DiagnosticKind {
                 name: "UndefinedName".to_string(),
                 body: "Undefined name `a`".to_string(),
-                suggestion: None,
             },
             TextRange::new(TextSize::from(3), TextSize::from(4)),
         );

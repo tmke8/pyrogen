@@ -14,7 +14,7 @@ use filetime::FileTime;
 use log::{debug, error, warn};
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Ranged;
-use rustpython_parser::text_size::TextRange;
+use rustpython_parser::text_size::{TextRange, TextSize};
 use similar::TextDiff;
 use thiserror::Error;
 

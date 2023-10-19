@@ -13,6 +13,7 @@ pyrogen_source_file = { path = "../pyrogen_source_file", features = ["serde"] }
 pyrogen_diagnostics = { path = "../pyrogen_diagnostics" }
 pyrogen_python_ast = { path = "../pyrogen_python_ast" }
 pyrogen_python_index = { path = "../pyrogen_python_index" }
+pyrogen_python_trivia = { path = "../pyrogen_python_trivia" }
 
 clap = { workspace = true, features = ["derive", "string"], optional = true }
 serde = { workspace = true }
@@ -41,6 +42,7 @@ result-like = "0.4.6"
 rustpython-parser = { workspace = true }
 itertools = { workspace = true }
 once_cell = { workspace = true }
+rustpython-ast = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }
