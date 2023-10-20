@@ -5,7 +5,7 @@ use std::path::Path;
 use itertools::Itertools;
 use rustpython_parser::ast::Ranged;
 
-use pyrogen_diagnostics::{Diagnostic, Violation};
+use pyrogen_diagnostics::{Diagnostic, DiagnosticKind, Violation};
 use pyrogen_python_trivia::CommentRanges;
 use pyrogen_source_file::Locator;
 
@@ -28,19 +28,19 @@ pub struct UnusedTypeIgnore {
 
 impl Violation for UnusedTypeIgnore {
     fn message(&self) -> String {
-        format!("Unused type ignore directive")
-    }
-
-    fn explanation() -> Option<&'static str> {
-        None
+        format!("Unused type ignore directive, with codes: {:?}", self.codes)
     }
 }
 
-impl From<UnusedTypeIgnore> for pyrogen_diagnostics::DiagnosticKind {
+// The following implementation is done by a macro in ruff.
+// TODO: It seems to me you can achieve the same thing with just a function which
+// composes the message and which also sets the "rule", so it can return a fully
+// formed DiagnosticKind.
+impl From<UnusedTypeIgnore> for DiagnosticKind {
     fn from(value: UnusedTypeIgnore) -> Self {
         Self {
             body: Violation::message(&value),
-            name: stringify!(#ident).to_string(),
+            name: "unused-type-ignore".to_string(), // reference to the "rule"
         }
     }
 }
