@@ -12,7 +12,6 @@ use rustpython_parser::text_size::{TextRange, TextSize};
 
 use crate::fs::relativize_path;
 use crate::line_width::{LineWidthBuilder, TabSize};
-use crate::message::diff::Diff;
 use crate::message::{Emitter, Message};
 use crate::registry::AsRule;
 
@@ -79,12 +78,6 @@ impl Emitter for TextEmitter {
 
             if self.flags.intersects(EmitterFlags::SHOW_SOURCE) {
                 writeln!(writer, "{}", MessageCodeFrame { message })?;
-            }
-
-            if self.flags.intersects(EmitterFlags::SHOW_FIX_DIFF) {
-                if let Some(diff) = Diff::from_message(message) {
-                    writeln!(writer, "{diff}")?;
-                }
             }
         }
 

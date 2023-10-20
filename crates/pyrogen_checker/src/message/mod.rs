@@ -7,18 +7,17 @@ use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Ranged;
 use rustpython_parser::text_size::{TextRange, TextSize};
 
-use pyrogen_diagnostics::{Diagnostic, DiagnosticKind, Fix};
+use pyrogen_diagnostics::{Diagnostic, DiagnosticKind};
 use pyrogen_source_file::{SourceFile, SourceLocation};
 pub use text::TextEmitter;
 
-mod diff;
+// mod diff;
 mod text;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Message {
     pub kind: DiagnosticKind,
     pub range: TextRange,
-    pub fix: Option<Fix>,
     pub file: SourceFile,
     pub noqa_offset: TextSize,
 }
@@ -32,7 +31,6 @@ impl Message {
         Self {
             range: diagnostic.range(),
             kind: diagnostic.kind,
-            fix: diagnostic.fix,
             file,
             noqa_offset,
         }
@@ -110,7 +108,7 @@ mod tests {
     use rustpython_parser::ast::Ranged;
     use rustpython_parser::text_size::{TextRange, TextSize};
 
-    use pyrogen_diagnostics::{Diagnostic, DiagnosticKind, Edit, Fix};
+    use pyrogen_diagnostics::{Diagnostic, DiagnosticKind, Edit};
     use pyrogen_source_file::SourceFileBuilder;
 
     use crate::message::{Emitter, Message};
@@ -136,11 +134,7 @@ def fibonacci(n):
                 body: "`os` imported but unused".to_string(),
             },
             TextRange::new(TextSize::from(7), TextSize::from(9)),
-        )
-        .with_fix(Fix::suggested(Edit::range_deletion(TextRange::new(
-            TextSize::from(0),
-            TextSize::from(10),
-        ))));
+        );
 
         let fib_source = SourceFileBuilder::new("fib.py", fib).finish();
 
@@ -150,11 +144,7 @@ def fibonacci(n):
                 body: "Local variable `x` is assigned to but never used".to_string(),
             },
             TextRange::new(TextSize::from(94), TextSize::from(95)),
-        )
-        .with_fix(Fix::suggested(Edit::deletion(
-            TextSize::from(94),
-            TextSize::from(99),
-        )));
+        );
 
         let file_2 = r#"if a == 1: pass"#;
 

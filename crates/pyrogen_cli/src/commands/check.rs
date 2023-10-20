@@ -37,7 +37,6 @@ pub(crate) fn check(
     overrides: &CliOverrides,
     cache: flags::Cache,
     noqa: flags::Noqa,
-    autofix: flags::FixMode,
 ) -> Result<Diagnostics> {
     // Collect all the Python files to check.
     let start = Instant::now();
@@ -121,7 +120,7 @@ pub(crate) fn check(
                         }
                     });
 
-                    lint_path(path, package, &settings.checker, cache, noqa, autofix).map_err(|e| {
+                    lint_path(path, package, &settings.checker, cache, noqa).map_err(|e| {
                         (Some(path.to_owned()), {
                             let mut error = e.to_string();
                             for cause in e.chain() {
@@ -144,27 +143,13 @@ pub(crate) fn check(
             .unwrap_or_else(|(path, message)| {
                 if let Some(path) = &path {
                     let settings = resolver.resolve(path, pyproject_config);
-                    if settings.checker.rules.enabled(Rule::IOError) {
-                        let dummy =
-                            SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();
-
-                        Diagnostics::new(
-                            vec![Message::from_diagnostic(
-                                Diagnostic::new(IOError { message }, TextRange::default()),
-                                dummy,
-                                TextSize::default(),
-                            )],
-                            ImportMap::default(),
-                        )
-                    } else {
-                        warn!(
-                            "{}{}{} {message}",
-                            "Failed to lint ".bold(),
-                            fs::relativize_path(path).bold(),
-                            ":".bold()
-                        );
-                        Diagnostics::default()
-                    }
+                    warn!(
+                        "{}{}{} {message}",
+                        "Failed to lint ".bold(),
+                        fs::relativize_path(path).bold(),
+                        ":".bold()
+                    );
+                    Diagnostics::default()
                 } else {
                     warn!("{} {message}", "Encountered error:".bold());
                     Diagnostics::default()
@@ -199,11 +184,9 @@ fn lint_path(
     settings: &CheckerSettings,
     cache: Option<&Cache>,
     noqa: flags::Noqa,
-    autofix: flags::FixMode,
 ) -> Result<Diagnostics> {
-    let result = catch_unwind(|| {
-        crate::diagnostics::lint_path(path, package, settings, cache, noqa, autofix)
-    });
+    let result =
+        catch_unwind(|| crate::diagnostics::lint_path(path, package, settings, cache, noqa));
 
     match result {
         Ok(inner) => inner,
@@ -285,7 +268,6 @@ mod test {
             &CliOverrides::default(),
             flags::Cache::Disabled,
             flags::Noqa::Disabled,
-            flags::FixMode::Generate,
         )
         .unwrap();
         let mut output = Vec::new();

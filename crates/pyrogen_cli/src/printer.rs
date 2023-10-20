@@ -36,7 +36,6 @@ struct ExpandedStatistics<'a> {
     code: SerializeRuleAsCode,
     message: &'a str,
     count: usize,
-    fixable: bool,
 }
 
 struct SerializeRuleAsCode(Rule);
@@ -46,13 +45,13 @@ impl Serialize for SerializeRuleAsCode {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_str(&self.0.noqa_code().to_string())
+        serializer.serialize_str(&self.0.code().to_string())
     }
 }
 
 impl Display for SerializeRuleAsCode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0.noqa_code())
+        write!(f, "{}", self.0.code())
     }
 }
 
@@ -65,7 +64,6 @@ impl From<Rule> for SerializeRuleAsCode {
 pub(crate) struct Printer {
     format: SerializationFormat,
     log_level: LogLevel,
-    autofix_level: flags::FixMode,
     flags: Flags,
 }
 
@@ -73,13 +71,11 @@ impl Printer {
     pub(crate) const fn new(
         format: SerializationFormat,
         log_level: LogLevel,
-        autofix_level: flags::FixMode,
         flags: Flags,
     ) -> Self {
         Self {
             format,
             log_level,
-            autofix_level,
             flags,
         }
     }
@@ -109,21 +105,6 @@ impl Printer {
                 } else if remaining > 0 {
                     let s = if remaining == 1 { "" } else { "s" };
                     writeln!(writer, "Found {remaining} error{s}.")?;
-                }
-
-                if show_fix_status(self.autofix_level) {
-                    let num_fixable = diagnostics
-                        .messages
-                        .iter()
-                        .filter(|message| message.fix.is_some())
-                        .count();
-                    if num_fixable > 0 {
-                        writeln!(
-                            writer,
-                            "[{}] {num_fixable} potentially fixable with the --fix option.",
-                            "*".cyan(),
-                        )?;
-                    }
                 }
             } else {
                 let fixed = diagnostics
@@ -158,13 +139,6 @@ impl Printer {
                 self.format,
                 SerializationFormat::Text | SerializationFormat::Grouped
             ) {
-                if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
-                    if !diagnostics.fixed.is_empty() {
-                        writeln!(writer)?;
-                        print_fix_summary(writer, &diagnostics.fixed)?;
-                        writeln!(writer)?;
-                    }
-                }
                 self.write_summary_text(writer, diagnostics)?;
             }
             return Ok(());
@@ -173,18 +147,8 @@ impl Printer {
         match self.format {
             SerializationFormat::Text => {
                 TextEmitter::default()
-                    .with_show_fix_status(show_fix_status(self.autofix_level))
-                    .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
                     .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
                     .emit(writer, &diagnostics.messages)?;
-
-                if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
-                    if !diagnostics.fixed.is_empty() {
-                        writeln!(writer)?;
-                        print_fix_summary(writer, &diagnostics.fixed)?;
-                        writeln!(writer)?;
-                    }
-                }
 
                 self.write_summary_text(writer, diagnostics)?;
             }
@@ -203,22 +167,16 @@ impl Printer {
         let statistics: Vec<ExpandedStatistics> = diagnostics
             .messages
             .iter()
-            .map(|message| {
-                (
-                    message.kind.rule(),
-                    &message.kind.body,
-                    message.fix.is_some(),
-                )
-            })
+            .map(|message| (message.kind.rule(), &message.kind.body))
             .sorted()
-            .fold(vec![], |mut acc, (rule, body, fixable)| {
+            .fold(vec![], |mut acc, (rule, body)| {
                 if let Some((prev_rule, _, _, count)) = acc.last_mut() {
                     if *prev_rule == rule {
                         *count += 1;
                         return acc;
                     }
                 }
-                acc.push((rule, body, fixable, 1));
+                acc.push((rule, body, 1));
                 acc
             })
             .iter()
@@ -226,7 +184,6 @@ impl Printer {
                 code: (*rule).into(),
                 count: *count,
                 message,
-                fixable: *fixable,
             })
             .sorted_by_key(|statistic| Reverse(statistic.count))
             .collect();
@@ -251,10 +208,6 @@ impl Printer {
                     .map(|statistic| statistic.code.to_string().len())
                     .max()
                     .unwrap();
-                let any_fixable = statistics.iter().any(|statistic| statistic.fixable);
-
-                let fixable = format!("[{}] ", "*".cyan());
-                let unfixable = "[ ] ";
 
                 // By default, we mimic Flake8's `--statistics` format.
                 for statistic in statistics {
@@ -263,23 +216,15 @@ impl Printer {
                         "{:>count_width$}\t{:<code_width$}\t{}{}",
                         statistic.count.to_string().bold(),
                         statistic.code.to_string().red().bold(),
-                        if any_fixable {
-                            if statistic.fixable {
-                                &fixable
-                            } else {
-                                unfixable
-                            }
-                        } else {
-                            ""
-                        },
+                        "",
                         statistic.message,
                     )?;
                 }
                 return Ok(());
             }
-            SerializationFormat::Json => {
-                writeln!(writer, "{}", serde_json::to_string_pretty(&statistics)?)?;
-            }
+            // SerializationFormat::Json => {
+            //     writeln!(writer, "{}", serde_json::to_string_pretty(&statistics)?)?;
+            // }
             _ => {
                 anyhow::bail!(
                     "Unsupported serialization format for statistics: {:?}",
@@ -320,7 +265,6 @@ impl Printer {
             }
 
             TextEmitter::default()
-                .with_show_fix_status(show_fix_status(self.autofix_level))
                 .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
                 .emit(writer, &diagnostics.messages)?;
         }
@@ -341,16 +285,6 @@ fn num_digits(n: usize) -> usize {
         .take_while(|&n| n > 0)
         .count()
         .max(1)
-}
-
-/// Return `true` if the [`Printer`] should indicate that a rule is fixable.
-const fn show_fix_status(autofix_level: flags::FixMode) -> bool {
-    // If we're in application mode, avoid indicating that a rule is fixable.
-    // If the specific violation were truly fixable, it would've been fixed in
-    // this pass! (We're occasionally unable to determine whether a specific
-    // violation is fixable without trying to fix it, so if autofix is not
-    // enabled, we may inadvertently indicate that a rule is fixable.)
-    !autofix_level.is_apply()
 }
 
 fn print_fix_summary(writer: &mut dyn Write, fixed: &FxHashMap<String, FixTable>) -> Result<()> {
@@ -386,7 +320,7 @@ fn print_fix_summary(writer: &mut dyn Write, fixed: &FxHashMap<String, FixTable>
             writeln!(
                 writer,
                 "    {count:>num_digits$} × {} ({})",
-                rule.noqa_code().to_string().red().bold(),
+                rule.code().to_string().red().bold(),
                 rule.as_ref(),
             )?;
         }

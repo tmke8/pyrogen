@@ -47,9 +47,7 @@ impl<'a> Directive<'a> {
             let mut ignore_start = ignore_literal_start + "type:".len();
 
             // Skip any whitespace between the `:` and the "ignore".
-            ignore_start += text[ignore_start..]
-                .find(|c: char| !c.is_whitespace())
-                .unwrap_or(0);
+            ignore_start += skip_whitespace(&text[ignore_start..]);
 
             // Check whether the next characters are "ignore".
             if !matches!(
@@ -92,55 +90,49 @@ impl<'a> Directive<'a> {
                     // E.g., `# type: ignore[call-arg,attr-defined]`.
                     let mut codes_start = ignore_literal_end;
 
-                    // Skip the `:` character.
+                    // Skip the `[` character.
                     codes_start += '['.len_utf8();
 
-                    // Skip any whitespace between the `[` and the codes.
-                    codes_start += text[codes_start..]
-                        .find(|c: char| !c.is_whitespace())
-                        .unwrap_or(0);
+                    // Find the closing bracket.
+                    let bracket_end = codes_start
+                        + text[codes_start..]
+                            .find(|c: char| c == ']')
+                            .ok_or(ParseError::NoClosingBracket)?;
 
-                    // TODO: fix this loop
+                    // Skip any whitespace between the `[` and the codes.
+                    codes_start += skip_whitespace(&text[codes_start..]);
+                    if codes_start >= bracket_end {
+                        return Err(ParseError::MissingCodes);
+                    }
 
                     // Extract the comma-separated list of codes.
                     let mut codes = vec![];
                     let mut codes_end = codes_start;
-                    let mut leading_space = 0;
-                    while let Some(code) = Self::lex_code(&text[codes_end + leading_space..]) {
-                        codes.push(code);
-                        codes_end += leading_space;
-                        codes_end += code.len();
 
-                        // Skip whitespace until the next comma
-                        leading_space += text[codes_end..]
-                            .find(|c: char| !c.is_whitespace())
-                            .unwrap_or(0);
+                    while codes_end < bracket_end {
+                        // Find next comma, whitespace, or end of bracket.
+                        let code_end = text[codes_end..bracket_end]
+                            .find(|c: char| c == ',' || c.is_whitespace())
+                            .unwrap_or(bracket_end - codes_end);
 
-                        // The next character has to be a comma.
-                        if text[codes_end + leading_space..]
-                            .chars()
-                            .last()
-                            .map_or(true, |c| c != ',')
-                        {
-                            return Err(ParseError::InvalidSuffix);
+                        codes.push(&text[codes_end..codes_end + code_end]);
+                        codes_end += code_end;
+
+                        // Skip any whitespace.
+                        codes_end += skip_whitespace(&text[codes_end..]);
+
+                        if codes_end >= bracket_end {
+                            break; // We've reached the closing bracket.
                         }
-                        leading_space -= ','.len_utf8();
 
-                        // Skip whitespace until the next comma
-                        leading_space += text[codes_end..]
-                            .find(|c: char| !c.is_whitespace())
-                            .unwrap_or(0);
-
-                        // Codes are comma-delimited. Compute the length of the
-                        // delimiter, but only add it in the next iteration, once we find the next
-                        // code.
-                        if let Some(space_between) =
-                            text[codes_end..].find(|c: char| !(c == ',' || c == ']'))
-                        {
-                            leading_space = space_between;
-                        } else {
-                            break;
+                        // Verify that the next character is a comma.
+                        if text[codes_end..].chars().next().map_or(true, |c| c != ',') {
+                            return Err(ParseError::MissingComma);
                         }
+                        codes_end += ','.len_utf8();
+
+                        // Skip any whitespace.
+                        codes_end += skip_whitespace(&text[codes_end..]);
                     }
 
                     // If we didn't identify any codes, warn.
@@ -169,16 +161,27 @@ impl<'a> Directive<'a> {
                     })
                 }
                 Some(c) if c.is_whitespace() => {
-                    // E.g., `# type: ignore # some comment`.
-                    let range = TextRange::new(
-                        TextSize::try_from(comment_start).unwrap(),
-                        TextSize::try_from(ignore_literal_end).unwrap(),
-                    );
-                    Self::All(All {
-                        range: range.add(offset),
-                    })
+                    // Skip any whitespace.
+                    let next_char = skip_whitespace(&text[ignore_literal_end..]);
+                    if next_char != 0
+                        && text[ignore_literal_end + next_char..]
+                            .chars()
+                            .next()
+                            .map_or(true, |c| c != '#')
+                    {
+                        return Err(ParseError::InvalidSuffix);
+                    } else {
+                        // E.g., `# type: ignore # some comment`.
+                        let range = TextRange::new(
+                            TextSize::try_from(comment_start).unwrap(),
+                            TextSize::try_from(ignore_literal_end).unwrap(),
+                        );
+                        Self::All(All {
+                            range: range.add(offset),
+                        })
+                    }
                 }
-                _ => return Err(ParseError::InvalidSuffix),
+                _ => continue, // There is something weird after "ignore" which makes this invalid
             };
 
             return Ok(Some(directive));
@@ -186,18 +189,11 @@ impl<'a> Directive<'a> {
 
         Ok(None)
     }
+}
 
-    /// Lex an individual rule code (e.g., `F401`).
-    #[inline]
-    fn lex_code(line: &str) -> Option<&str> {
-        // Extract, e.g., the `F` in `F401`.
-        let prefix = line.chars().take_while(char::is_ascii_alphabetic).count();
-        if prefix > 0 {
-            Some(&line[..prefix])
-        } else {
-            None
-        }
-    }
+#[inline]
+fn skip_whitespace(line: &str) -> usize {
+    line.find(|c: char| !c.is_whitespace()).unwrap_or(0)
 }
 
 #[derive(Debug)]
@@ -341,125 +337,12 @@ enum ParsedFileExemption<'a> {
 impl<'a> ParsedFileExemption<'a> {
     /// Return a [`ParsedFileExemption`] for a given comment line.
     fn try_extract(line: &'a str) -> Result<Option<Self>, ParseError> {
-        let line = Self::lex_whitespace(line);
-        let Some(line) = Self::lex_char(line, '#') else {
-            return Ok(None);
-        };
-        let line = Self::lex_whitespace(line);
-
-        let Some(line) = Self::lex_type(line) else {
-            return Ok(None);
-        };
-
-        let line = Self::lex_whitespace(line);
-        let Some(line) = Self::lex_char(line, ':') else {
-            return Ok(None);
-        };
-        let line = Self::lex_whitespace(line);
-        let Some(line) = Self::lex_ignore(line) else {
-            return Ok(None);
-        };
-        let line = Self::lex_whitespace(line);
-
-        Ok(Some(if line.is_empty() {
-            // Ex) `# ruff: noqa`
-            Self::All
-        } else {
-            // Ex) `# ruff: noqa: F401, F841`
-            let Some(line) = Self::lex_char(line, ':') else {
-                return Err(ParseError::InvalidSuffix);
-            };
-            let line = Self::lex_whitespace(line);
-
-            // Extract the codes from the line (e.g., `F401, F841`).
-            let mut codes = vec![];
-            let mut line = line;
-            while let Some(code) = Self::lex_code(line) {
-                codes.push(code);
-                line = &line[code.len()..];
-
-                // Codes can be comma- or whitespace-delimited.
-                if let Some(rest) = Self::lex_delimiter(line).map(Self::lex_whitespace) {
-                    line = rest;
-                } else {
-                    break;
-                }
-            }
-
-            // If we didn't identify any codes, warn.
-            if codes.is_empty() {
-                return Err(ParseError::MissingCodes);
-            }
-
-            Self::Codes(codes)
-        }))
-    }
-
-    /// Lex optional leading whitespace.
-    #[inline]
-    fn lex_whitespace(line: &str) -> &str {
-        line.trim_start()
-    }
-
-    /// Lex a specific character, or return `None` if the character is not the first character in
-    /// the line.
-    #[inline]
-    fn lex_char(line: &str, c: char) -> Option<&str> {
-        let mut chars = line.chars();
-        if chars.next() == Some(c) {
-            Some(chars.as_str())
-        } else {
-            None
-        }
-    }
-
-    /// Lex the "type" prefix of an `ignore` directive.
-    #[inline]
-    fn lex_type(line: &str) -> Option<&str> {
-        line.strip_prefix("type")
-    }
-
-    /// Lex a `noqa` directive with case-insensitive matching.
-    #[inline]
-    fn lex_ignore(line: &str) -> Option<&str> {
-        match line.as_bytes() {
-            [b'i' | b'I', b'g' | b'G', b'n' | b'N', b'o' | b'O', b'r' | b'R', b'e' | b'E', ..] => {
-                Some(&line["ignore".len()..])
-            }
-            _ => None,
-        }
-    }
-
-    /// Lex a code delimiter, which can either be a comma or whitespace.
-    #[inline]
-    fn lex_delimiter(line: &str) -> Option<&str> {
-        let mut chars = line.chars();
-        if let Some(c) = chars.next() {
-            if c == ',' || c.is_whitespace() {
-                Some(chars.as_str())
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }
-
-    /// Lex an individual rule code (e.g., `F401`).
-    #[inline]
-    fn lex_code(line: &str) -> Option<&str> {
-        // Extract, e.g., the `F` in `F401`.
-        let prefix = line.chars().take_while(char::is_ascii_uppercase).count();
-        // Extract, e.g., the `401` in `F401`.
-        let suffix = line[prefix..]
-            .chars()
-            .take_while(char::is_ascii_digit)
-            .count();
-        if prefix > 0 && suffix > 0 {
-            Some(&line[..prefix + suffix])
-        } else {
-            None
-        }
+        Directive::try_extract(line, TextSize::new(0)).map(|directive| {
+            directive.map(|directive| match directive {
+                Directive::All(_) => Self::All,
+                Directive::Codes(Codes { codes, range: _ }) => Self::Codes(codes),
+            })
+        })
     }
 }
 
@@ -470,32 +353,27 @@ pub(crate) enum ParseError {
     MissingCodes,
     /// The `noqa` directive used an invalid suffix (e.g., `# noqa; F401` instead of `# noqa: F401`).
     InvalidSuffix,
+    NoClosingBracket,
+    MissingComma,
 }
 
 impl Display for ParseError {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ParseError::MissingCodes => fmt.write_str("expected a comma-separated list of codes (e.g., `# noqa: F401, F841`)."),
+            ParseError::MissingCodes => {
+                fmt.write_str("expected a comma-separated list of codes (e.g., `# type: ignore[override,unreachable]`).")
+            },
             ParseError::InvalidSuffix => {
-                fmt.write_str("expected `:` followed by a comma-separated list of codes (e.g., `# noqa: F401, F841`).")
+                fmt.write_str("after `# type: ignore` the line should continue with brackets or start a new comment with `#`.")
             }
+            ParseError::MissingComma => fmt.write_str("expected a comma-separated list of codes (e.g., `# type: ignore[override,unreachable]`)."),
+            ParseError::NoClosingBracket => fmt.write_str("bracket after `ignore` directive is not closed.")
 
         }
     }
 }
 
 impl Error for ParseError {}
-
-fn push_codes<I: Display>(str: &mut String, codes: impl Iterator<Item = I>) {
-    let mut first = true;
-    for code in codes {
-        if !first {
-            str.push_str(", ");
-        }
-        write!(str, "{code}").unwrap();
-        first = false;
-    }
-}
 
 #[derive(Debug)]
 pub(crate) struct NoqaDirectiveLine<'a> {
@@ -675,176 +553,181 @@ mod tests {
 
     #[test]
     fn noqa_code() {
-        let source = "# type: ignore[unreachable]call";
+        let source = "# type: ignore[unreachable]";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_codes() {
-        let source = "# noqa: F401, F841";
+        let source = "# type: ignore[unreachable,override]";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_all_case_insensitive() {
-        let source = "# NOQA";
+        let source = "# TYPE: IGNORE";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_code_case_insensitive() {
-        let source = "# NOQA: F401";
+        let source = "# TYPE: IGNORE[override]";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_codes_case_insensitive() {
-        let source = "# NOQA: F401, F841";
+        let source = "# TYPE: IGNORE[override , unreachable]";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_leading_space() {
-        let source = "#   # noqa: F401";
+        let source = "#   # type: ignore[override]";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_trailing_space() {
-        let source = "# noqa: F401   #";
+        let source = "# type: ignore[override]   ";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_all_no_space() {
-        let source = "#noqa";
+        let source = "#type:ignore";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_code_no_space() {
-        let source = "#noqa:F401";
+        let source = "#type:ignore[override]";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_codes_no_space() {
-        let source = "#noqa:F401,F841";
+        let source = "#type:ignore[override,unreachable]";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_all_multi_space() {
-        let source = "#  noqa";
+        let source = "#  type:  ignore";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_code_multi_space() {
-        let source = "#  noqa: F401";
+        let source = "#  type:  ignore[override]";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_codes_multi_space() {
-        let source = "#  type:  ignore[ override]";
+        let source = "#  type:  ignore[ override  , unreachable]";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_all_leading_comment() {
-        let source = "# Some comment describing the noqa # noqa";
+        let source = "# Comment describing the ignore # type: ignore";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_code_leading_comment() {
-        let source = "# Some comment describing the noqa # noqa: F401";
+        let source = "# Comment describing the ignore # type: ignore[override]";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_codes_leading_comment() {
-        let source = "# Some comment describing the noqa # noqa: F401, F841";
+        let source = "# Comment describing the ignore # type: ignore[override,unreachable]";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_all_trailing_comment() {
-        let source = "# type: ignore # Some comment describing the noqa";
+        let source = "# type: ignore # Comment describing the ignore";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_code_trailing_comment() {
-        let source = "# type: ignore[override] # Some comment describing the noqa";
+        let source = "# type: ignore[override] # Comment describing the ignore";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_codes_trailing_comment() {
-        let source = "# noqa: F401, F841 # Some comment describing the noqa";
+        let source = "# type: ignore[override,unreachable] # Comment describing the noqa";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_invalid_codes() {
-        let source = "# noqa: unused-import, F401, some other code";
+        let source = "# type: ignore[code with spaces]";
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+    }
+
+    #[test]
+    fn noqa_open_bracket() {
+        let source = "# type: ignore[override";
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+    }
+
+    #[test]
+    fn noqa_empty_open_bracket() {
+        let source = "# type: ignore[  ";
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+    }
+
+    #[test]
+    fn noqa_empty_bracket() {
+        let source = "# type: ignore[  ]";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_invalid_suffix() {
-        let source = "# noqa[F401]";
+        let source = "# type: ignorea";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
-    fn flake8_exemption_all() {
-        let source = "# flake8: noqa";
+    fn noqa_typo() {
+        let source = "# type: ignoe";
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+    }
+
+    #[test]
+    fn noqa_invalid_suffix_with_space() {
+        let source = "# type: ignore a";
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+    }
+
+    #[test]
+    fn pyrogen_exemption_all() {
+        let source = "# type: ignore";
         assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
     }
 
     #[test]
-    fn ruff_exemption_all() {
-        let source = "# ruff: noqa";
+    fn pyrogen_exemption_all_no_space() {
+        let source = "#type:ignore";
         assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
     }
 
     #[test]
-    fn flake8_exemption_all_no_space() {
-        let source = "#flake8:noqa";
+    fn pyrogen_exemption_codes() {
+        let source = "# type: ignore[override,unreachable]";
         assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
     }
 
     #[test]
-    fn ruff_exemption_all_no_space() {
-        let source = "#ruff:noqa";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
-    }
-
-    #[test]
-    fn flake8_exemption_codes() {
-        // Note: Flake8 doesn't support this; it's treated as a blanket exemption.
-        let source = "# flake8: noqa: F401, F841";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
-    }
-
-    #[test]
-    fn ruff_exemption_codes() {
-        let source = "# ruff: noqa: F401, F841";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
-    }
-
-    #[test]
-    fn flake8_exemption_all_case_insensitive() {
-        let source = "# flake8: NoQa";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
-    }
-
-    #[test]
-    fn ruff_exemption_all_case_insensitive() {
-        let source = "# ruff: NoQa";
+    fn pyrogen_exemption_all_case_insensitive() {
+        let source = "# type: IgNoRe";
         assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
     }
 }

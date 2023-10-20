@@ -1,0 +1,14 @@
+---
+source: crates/pyrogen_checker/src/type_ignore.rs
+expression: "ParsedFileExemption::try_extract(source)"
+---
+Ok(
+    Some(
+        Codes(
+            [
+                "override",
+                "unreachable",
+            ],
+        ),
+    ),
+)

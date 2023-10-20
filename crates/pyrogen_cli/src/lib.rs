@@ -17,6 +17,7 @@ use crate::args::{Args, CheckCommand};
 use crate::printer::{Flags as PrinterFlags, Printer};
 
 pub mod args;
+mod cache;
 mod commands;
 mod diagnostics;
 mod printer;
@@ -172,7 +173,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         writeln!(writer, "{}", entry.path().to_string_lossy())?;
     }
 
-    let printer = Printer::new(output_format, log_level, autofix, printer_flags);
+    let printer = Printer::new(output_format, log_level, printer_flags);
 
     let is_stdin = is_stdin(&cli.files, cli.stdin_filename.as_deref());
 
@@ -183,7 +184,6 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
             &pyproject_config,
             &overrides,
             noqa.into(),
-            autofix,
         )?
     } else {
         commands::check::check(
@@ -192,20 +192,8 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
             &overrides,
             cache.into(),
             noqa.into(),
-            autofix,
         )?
     };
-
-    // Always try to print violations (the printer itself may suppress output),
-    // unless we're writing fixes via stdin (in which case, the transformed
-    // source code goes to stdout).
-    if !(is_stdin && matches!(autofix, flags::FixMode::Apply | flags::FixMode::Diff)) {
-        if cli.statistics {
-            printer.write_statistics(&diagnostics, &mut writer)?;
-        } else {
-            printer.write_once(&diagnostics, &mut writer)?;
-        }
-    }
 
     if !cli.exit_zero {
         if !diagnostics.messages.is_empty() {

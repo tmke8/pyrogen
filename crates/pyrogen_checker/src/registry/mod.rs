@@ -23,6 +23,9 @@ pub enum Rule {
 
     #[strum(serialize = "syntax-error")]
     SyntaxError,
+
+    #[strum(serialize = "general")]
+    GeneralTypeError,
 }
 
 pub trait AsRule {

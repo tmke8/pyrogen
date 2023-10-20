@@ -19,6 +19,7 @@ name = "pyrogen"
 [dependencies]
 pyrogen_parser = { path = "../pyrogen_parser" }
 pyrogen_workspace = { path = "../pyrogen_workspace" }
+pyrogen_cache = { path = "../pyrogen_cache" }
 pyrogen_checker = { path = "../pyrogen_checker", features = ["clap"] }
 pyrogen_diagnostics = { path = "../pyrogen_diagnostics" }
 pyrogen_macros = { path = "../pyrogen_macros" }
@@ -45,7 +46,11 @@ thiserror = { workspace = true }
 rustpython-parser = { workspace = true }
 wild = { version = "2.2.0" }
 clearscreen = "2.0.0"
+itoa = "1.0.6"
+bincode = "1.3.3"
+cachedir = "0.3.0"
 
 [dev-dependencies]
 insta = { workspace = true, features = ["filters"] }
 tempfile = "3.8.0"
+test-case = { workspace = true }

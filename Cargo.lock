@@ -119,6 +119,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
 
 [[package]]
+name = "bincode"
+version = "1.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1f45e9417d87227c7a56d22e471c6206462cba514c7590c09aff4cf6d1ddcad"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "bitflags"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -161,6 +170,15 @@ name = "bumpalo"
 version = "3.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f30e7476521f6f8af1a1c4c0b8cc94f0bee37d91763d0ca2665f299b6cd8aec"
+
+[[package]]
+name = "cachedir"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e236bf5873ea57ec2877445297f4da008916bfae51567131acfc54a073d694f3"
+dependencies = [
+ "tempfile",
+]
 
 [[package]]
 name = "cc"
@@ -1141,7 +1159,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "argfile",
+ "bincode",
  "bitflags 2.4.0",
+ "cachedir",
  "clap",
  "clearscreen",
  "colored",
@@ -1149,8 +1169,10 @@ dependencies = [
  "ignore",
  "insta",
  "itertools 0.11.0",
+ "itoa",
  "log",
  "path-absolutize",
+ "pyrogen_cache",
  "pyrogen_checker",
  "pyrogen_diagnostics",
  "pyrogen_macros",
@@ -1166,6 +1188,7 @@ dependencies = [
  "shellexpand",
  "similar",
  "tempfile",
+ "test-case",
  "thiserror",
  "wild",
 ]

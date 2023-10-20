@@ -1,12 +1,5 @@
-use anyhow::Result;
-use log::error;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
-
 use rustpython_parser::ast::Ranged;
 use rustpython_parser::text_size::{TextRange, TextSize};
-
-use crate::Fix;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -21,7 +14,6 @@ pub struct DiagnosticKind {
 pub struct Diagnostic {
     pub kind: DiagnosticKind,
     pub range: TextRange,
-    pub fix: Option<Fix>,
     pub parent: Option<TextSize>,
 }
 
@@ -30,43 +22,7 @@ impl Diagnostic {
         Self {
             kind: kind.into(),
             range,
-            fix: None,
             parent: None,
-        }
-    }
-
-    /// Consumes `self` and returns a new `Diagnostic` with the given `fix`.
-    #[inline]
-    #[must_use]
-    pub fn with_fix(mut self, fix: Fix) -> Self {
-        self.set_fix(fix);
-        self
-    }
-
-    /// Set the [`Fix`] used to fix the diagnostic.
-    #[inline]
-    pub fn set_fix(&mut self, fix: Fix) {
-        self.fix = Some(fix);
-    }
-
-    /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.
-    /// Otherwise, log the error.
-    #[inline]
-    pub fn try_set_fix(&mut self, func: impl FnOnce() -> Result<Fix>) {
-        match func() {
-            Ok(fix) => self.fix = Some(fix),
-            Err(err) => error!("Failed to create fix for {}: {}", self.kind.name, err),
-        }
-    }
-
-    /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.
-    /// Otherwise, log the error.
-    #[inline]
-    pub fn try_set_optional_fix(&mut self, func: impl FnOnce() -> Result<Option<Fix>>) {
-        match func() {
-            Ok(None) => {}
-            Ok(Some(fix)) => self.fix = Some(fix),
-            Err(err) => error!("Failed to create fix for {}: {}", self.kind.name, err),
         }
     }
 

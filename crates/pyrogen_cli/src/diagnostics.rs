@@ -63,17 +63,12 @@ impl FileCacheKey {
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Diagnostics {
     pub(crate) messages: Vec<Message>,
-    pub(crate) fixed: FxHashMap<String, FixTable>,
     pub(crate) imports: ImportMap,
 }
 
 impl Diagnostics {
     pub(crate) fn new(messages: Vec<Message>, imports: ImportMap) -> Self {
-        Self {
-            messages,
-            fixed: FxHashMap::default(),
-            imports,
-        }
+        Self { messages, imports }
     }
 
     /// Generate [`Diagnostics`] based on a [`SourceExtractionError`].
@@ -118,17 +113,6 @@ impl AddAssign for Diagnostics {
     fn add_assign(&mut self, other: Self) {
         self.messages.extend(other.messages);
         self.imports.extend(other.imports);
-        for (filename, fixed) in other.fixed {
-            if fixed.is_empty() {
-                continue;
-            }
-            let fixed_in_file = self.fixed.entry(filename).or_default();
-            for (rule, count) in fixed {
-                if count > 0 {
-                    *fixed_in_file.entry(rule).or_default() += count;
-                }
-            }
-        }
     }
 }
 
@@ -139,27 +123,8 @@ pub(crate) fn lint_path(
     settings: &CheckerSettings,
     cache: Option<&Cache>,
     noqa: flags::Noqa,
-    autofix: flags::FixMode,
 ) -> Result<Diagnostics> {
     // Check the cache.
-    let caching = match cache {
-        Some(cache) if noqa.into() && autofix.is_generate() => {
-            let relative_path = cache
-                .relative_path(path)
-                .expect("wrong package cache for file");
-
-            let cache_key = FileCacheKey::from_path(path).context("Failed to create cache key")?;
-
-            if let Some(cache) = cache.get(relative_path, &cache_key) {
-                return Ok(cache.as_diagnostics(path));
-            }
-
-            // Stash the file metadata for later so when we update the cache it reflects the prerun
-            // information
-            Some((cache, relative_path, cache_key))
-        }
-        _ => None,
-    };
 
     debug!("Checking: {}", path.display());
 
@@ -215,13 +180,6 @@ pub(crate) fn lint_path(
 
     let imports = imports.unwrap_or_default();
 
-    if let Some((cache, relative_path, key)) = caching {
-        // We don't cache parsing errors.
-        if parse_error.is_none() {
-            cache.update(relative_path.to_owned(), key, &messages, &imports);
-        }
-    }
-
     if let Some(err) = parse_error {
         error!(
             "{}",
@@ -236,11 +194,7 @@ pub(crate) fn lint_path(
         );
     }
 
-    Ok(Diagnostics {
-        messages,
-        fixed: FxHashMap::from_iter([(fs::relativize_path(path), fixed)]),
-        imports,
-    })
+    Ok(Diagnostics { messages, imports })
 }
 
 /// Generate `Diagnostic`s from source code content derived from
@@ -251,9 +205,7 @@ pub(crate) fn lint_stdin(
     contents: String,
     settings: &Settings,
     noqa: flags::Noqa,
-    autofix: flags::FixMode,
 ) -> Result<Diagnostics> {
-    // TODO(charlie): Support `pyproject.toml`.
     let SourceType::Python(source_type) = path.map(SourceType::from).unwrap_or_default() else {
         return Ok(Diagnostics::default());
     };
@@ -263,7 +215,11 @@ pub(crate) fn lint_stdin(
         Ok(Some(sources)) => sources,
         Ok(None) => return Ok(Diagnostics::default()),
         Err(err) => {
-            return Ok(Diagnostics::from_source_error(&err, path, &settings.linter));
+            return Ok(Diagnostics::from_source_error(
+                &err,
+                path,
+                &settings.checker,
+            ));
         }
     };
 
@@ -274,11 +230,11 @@ pub(crate) fn lint_stdin(
             error: parse_error,
         },
         fixed,
-    ) = if matches!(autofix, flags::FixMode::Apply | flags::FixMode::Diff) {
+    ) = {
         let result = lint_only(
             path.unwrap_or_else(|| Path::new("-")),
             package,
-            &settings.linter,
+            &settings.checker,
             noqa,
             &source_kind,
             source_type,
@@ -296,14 +252,7 @@ pub(crate) fn lint_stdin(
         );
     }
 
-    Ok(Diagnostics {
-        messages,
-        fixed: FxHashMap::from_iter([(
-            fs::relativize_path(path.unwrap_or_else(|| Path::new("-"))),
-            fixed,
-        )]),
-        imports,
-    })
+    Ok(Diagnostics { messages, imports })
 }
 
 #[derive(Debug)]

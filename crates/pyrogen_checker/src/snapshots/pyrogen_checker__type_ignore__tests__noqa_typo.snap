@@ -1,0 +1,7 @@
+---
+source: crates/pyrogen_checker/src/type_ignore.rs
+expression: "Directive::try_extract(source, TextSize::default())"
+---
+Ok(
+    None,
+)
