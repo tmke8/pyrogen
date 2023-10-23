@@ -10,39 +10,40 @@ rust-version.workspace = true
 pyrogen_macros = { path = "../pyrogen_macros" }
 pyrogen_cache = { path = "../pyrogen_cache" }
 pyrogen_source_file = { path = "../pyrogen_source_file", features = ["serde"] }
-pyrogen_diagnostics = { path = "../pyrogen_diagnostics" }
 pyrogen_python_ast = { path = "../pyrogen_python_ast" }
 pyrogen_python_index = { path = "../pyrogen_python_index" }
 pyrogen_python_trivia = { path = "../pyrogen_python_trivia" }
 
-clap = { workspace = true, features = ["derive", "string"], optional = true }
-serde = { workspace = true }
+annotate-snippets = { version = "0.9.1", features = ["color"] }
 anyhow = { workspace = true }
-pep440_rs = { version = "0.3.1", features = ["serde"] }
-strum_macros = { workspace = true }
-strum = { workspace = true }
+bitflags = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true, features = ["derive", "string"], optional = true }
+colored = { workspace = true }
+fern = { version = "0.6.2" }
 globset = { workspace = true }
+is-macro = { workspace = true }
+itertools = { workspace = true }
 log = { workspace = true }
+once_cell = { workspace = true }
+pep440_rs = { version = "0.3.1", features = ["serde"] }
+serde = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
 path-absolutize = { workspace = true, features = [
     "once_cell_cache",
     "use_unix_paths_on_wasm",
 ] }
 pathdiff = { version = "0.2.1" }
-colored = { workspace = true }
-chrono = { workspace = true }
-bitflags = { workspace = true }
-fern = { version = "0.6.2" }
-annotate-snippets = { version = "0.9.1", features = ["color"] }
-similar = { workspace = true }
-rustc-hash = { workspace = true }
-is-macro = { workspace = true }
-thiserror = { workspace = true }
-unicode-width = { workspace = true }
+pyproject-toml = "0.7.0"
 result-like = "0.4.6"
-rustpython-parser = { workspace = true }
-itertools = { workspace = true }
-once_cell = { workspace = true }
+rustc-hash = { workspace = true }
 rustpython-ast = { workspace = true }
+rustpython-parser = { workspace = true }
+similar = { workspace = true }
+thiserror = { workspace = true }
+toml = { workspace = true }
+unicode-width = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }

@@ -2,7 +2,7 @@ use pyrogen_macros::OptionsMetadata;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
-use pyrogen_checker::{settings::types::PythonVersion, RuleSelector};
+use pyrogen_checker::{settings::types::PythonVersion, ErrorCodeSelector};
 
 #[derive(Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -40,7 +40,7 @@ pub struct Options {
             ignore = ["F841"]
         "#
     )]
-    pub ignore: Option<Vec<RuleSelector>>,
+    pub ignore: Option<Vec<ErrorCodeSelector>>,
 
     /// A list of rule codes or prefixes to enable. Prefixes can specify exact
     /// rules (like `F841`), entire categories (like `F`), or anything in
@@ -57,7 +57,7 @@ pub struct Options {
             select = ["E", "F", "B", "Q"]
         "#
     )]
-    pub select: Option<Vec<RuleSelector>>,
+    pub select: Option<Vec<ErrorCodeSelector>>,
 
     // Tables are required to go last.
     /// A list of mappings from file pattern to rule codes or prefixes to
@@ -72,7 +72,7 @@ pub struct Options {
             "path/to/file.py" = ["E402"]
         "#
     )]
-    pub per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
+    pub per_file_ignores: Option<FxHashMap<String, Vec<ErrorCodeSelector>>>,
 
     /// A list of file patterns to exclude from linting.
     ///

@@ -15,10 +15,9 @@ use rustc_hash::FxHashMap;
 use rustpython_parser::text_size::{TextRange, TextSize};
 
 use pyrogen_checker::message::Message;
-use pyrogen_checker::registry::Rule;
+use pyrogen_checker::registry::ErrorCode;
 use pyrogen_checker::settings::{flags, CheckerSettings};
-use pyrogen_checker::{fs, warn_user_once, IOError};
-use pyrogen_diagnostics::Diagnostic;
+use pyrogen_checker::{fs, warn_user_once};
 use pyrogen_python_ast::imports::ImportMap;
 use pyrogen_source_file::SourceFileBuilder;
 use pyrogen_workspace::resolver::{
@@ -191,9 +190,9 @@ fn lint_path(
     match result {
         Ok(inner) => inner,
         Err(error) => {
-            let message = r#"This indicates a bug in Ruff. If you could open an issue at:
+            let message = r#"This indicates a bug in Pyrogen. If you could open an issue at:
 
-    https://github.com/astral-sh/ruff/issues/new?title=%5BChecker%20panic%5D
+    https://github.com/tmke8/pyrogen/issues/new?title=%5BChecker%20panic%5D
 
 ...with the relevant file contents, the `pyproject.toml` settings, and the following stack trace, we'd be very appreciative!
 "#;
@@ -221,7 +220,7 @@ mod test {
     use tempfile::TempDir;
 
     use pyrogen_checker::message::{Emitter, TextEmitter};
-    use pyrogen_checker::registry::Rule;
+    use pyrogen_checker::registry::ErrorCode;
     use pyrogen_checker::settings::{flags, CheckerSettings};
     use pyrogen_workspace::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
     use pyrogen_workspace::Settings;
@@ -235,14 +234,13 @@ mod test {
     #[test]
     fn unreadable_files() -> Result<()> {
         let path = "E902.py";
-        let rule_code = Rule::IOError;
+        let rule_code = ErrorCode::IOError;
 
         // Create inaccessible files
         let tempdir = TempDir::new()?;
         let pyproject_toml = tempdir.path().join("pyproject.toml");
         let python_file = tempdir.path().join("code.py");
-        let notebook = tempdir.path().join("notebook.ipynb");
-        for file in [&pyproject_toml, &python_file, &notebook] {
+        for file in [&pyproject_toml, &python_file] {
             fs::OpenOptions::new()
                 .create(true)
                 .write(true)
@@ -251,10 +249,10 @@ mod test {
         }
 
         // Configure
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path);
+        let snapshot = format!("{}_{}", rule_code.to_str(), path);
         // invalid pyproject.toml is not active by default
         let settings = Settings {
-            checker: CheckerSettings::for_rules(vec![rule_code, Rule::InvalidPyprojectToml]),
+            checker: CheckerSettings::for_rules(vec![rule_code, ErrorCode::InvalidPyprojectToml]),
             ..Settings::default()
         };
         let pyproject_config =
@@ -263,7 +261,7 @@ mod test {
         // Run
         let diagnostics = check(
             // Notebooks are not included by default
-            &[tempdir.path().to_path_buf(), notebook],
+            &[tempdir.path().to_path_buf()],
             &pyproject_config,
             &CliOverrides::default(),
             flags::Cache::Disabled,

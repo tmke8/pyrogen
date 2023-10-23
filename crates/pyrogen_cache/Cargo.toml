@@ -12,3 +12,4 @@ itertools = { workspace = true }
 regex = { workspace = true }
 globset = { workspace = true }
 seahash = "4.1.0"
+filetime = { workspace = true }

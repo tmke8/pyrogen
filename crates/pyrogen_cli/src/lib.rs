@@ -7,10 +7,11 @@ use std::{
 use anyhow::Result;
 use itertools::Itertools;
 use pyrogen_checker::{
+    fs,
     logging::{set_up_logging, LogLevel},
+    settings::types::SerializationFormat,
     warn_user_once,
 };
-use pyrogen_parser::{self, parser_test};
 use pyrogen_workspace::resolver::python_files_in_path;
 
 use crate::args::{Args, CheckCommand};
@@ -20,17 +21,9 @@ pub mod args;
 mod cache;
 mod commands;
 mod diagnostics;
+mod panic;
 mod printer;
 pub mod resolve;
-
-pub fn print_message() {
-    let num = 10;
-    println!(
-        "Hello, world! {num} plus one is {}!",
-        pyrogen_parser::add_one(num)
-    );
-    parser_test();
-}
 
 #[derive(Copy, Clone)]
 pub enum ExitStatus {
@@ -173,18 +166,23 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         writeln!(writer, "{}", entry.path().to_string_lossy())?;
     }
 
+    let output_format = SerializationFormat::Text;
+    let printer_flags = PrinterFlags::SHOW_VIOLATIONS;
     let printer = Printer::new(output_format, log_level, printer_flags);
 
     let is_stdin = is_stdin(&cli.files, cli.stdin_filename.as_deref());
+    let cache = !cli.no_cache;
+    let noqa = true;
 
     // Generate lint violations.
     let diagnostics = if is_stdin {
-        commands::check_stdin::check_stdin(
-            cli.stdin_filename.map(fs::normalize_path).as_deref(),
-            &pyproject_config,
-            &overrides,
-            noqa.into(),
-        )?
+        todo!("implement stdin")
+        // commands::check_stdin::check_stdin(
+        //     cli.stdin_filename.map(fs::normalize_path).as_deref(),
+        //     &pyproject_config,
+        //     &overrides,
+        //     noqa.into(),
+        // )?
     } else {
         commands::check::check(
             &cli.files,
@@ -194,6 +192,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
             noqa.into(),
         )?
     };
+    printer.write_once(&diagnostics, &mut writer)?;
 
     if !cli.exit_zero {
         if !diagnostics.messages.is_empty() {

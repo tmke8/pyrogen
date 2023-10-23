@@ -4,13 +4,13 @@ use globset::GlobMatcher;
 use log::debug;
 use path_absolutize::Absolutize;
 
-use crate::registry::RuleSet;
+use crate::registry::ErrorCodeSet;
 
 /// Create a set with codes matching the pattern/code pairs.
 pub(crate) fn ignores_from_path(
     path: &Path,
-    pattern_code_pairs: &[(GlobMatcher, GlobMatcher, RuleSet)],
-) -> RuleSet {
+    pattern_code_pairs: &[(GlobMatcher, GlobMatcher, ErrorCodeSet)],
+) -> ErrorCodeSet {
     let file_name = path.file_name().expect("Unable to parse filename");
     pattern_code_pairs
         .iter()

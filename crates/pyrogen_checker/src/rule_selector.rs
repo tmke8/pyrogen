@@ -5,26 +5,27 @@ use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-use crate::registry::{Rule, RuleIter, RuleNamespace};
+use crate::registry::{ErrorCode, ErrorCodeIter};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum RuleSelector {
-    /// Select all rules (includes rules in preview if enabled)
+pub enum ErrorCodeSelector {
+    /// Select all error codes.
     All,
-    /// Select an individual rule with a given prefix.
-    Rule(Rule),
+    /// Select an individual error code.
+    ErrorCode(ErrorCode),
 }
 
-impl FromStr for RuleSelector {
+impl FromStr for ErrorCodeSelector {
     type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "ALL" => Ok(Self::All),
             _ => {
-                // Does the selector select a single rule?
-                let prefix = Rule::from_code(&s).map_err(|_| ParseError::Unknown(s.to_string()))?;
-                Ok(Self::Rule(prefix))
+                // Does the selector select a single error code?
+                let prefix =
+                    ErrorCode::from_str(&s).map_err(|_| ParseError::Unknown(s.to_string()))?;
+                Ok(Self::ErrorCode(prefix))
             }
         }
     }
@@ -33,21 +34,19 @@ impl FromStr for RuleSelector {
 #[derive(Debug, thiserror::Error)]
 pub enum ParseError {
     #[error("Unknown rule selector: `{0}`")]
-    // TODO(martin): tell the user how to discover rule codes via the CLI once such a command is
-    // implemented (but that should of course be done only in ruff_cli and not here)
     Unknown(String),
 }
 
-impl RuleSelector {
+impl ErrorCodeSelector {
     pub fn code(&self) -> &'static str {
         match self {
-            RuleSelector::All => "ALL",
-            RuleSelector::Rule(rule) => rule.code(),
+            ErrorCodeSelector::All => "ALL",
+            ErrorCodeSelector::ErrorCode(rule) => rule.to_str(),
         }
     }
 }
 
-impl Serialize for RuleSelector {
+impl Serialize for ErrorCodeSelector {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -57,7 +56,7 @@ impl Serialize for RuleSelector {
     }
 }
 
-impl<'de> Deserialize<'de> for RuleSelector {
+impl<'de> Deserialize<'de> for ErrorCodeSelector {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -74,7 +73,7 @@ impl<'de> Deserialize<'de> for RuleSelector {
 struct SelectorVisitor;
 
 impl Visitor<'_> for SelectorVisitor {
-    type Value = RuleSelector;
+    type Value = ErrorCodeSelector;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         formatter.write_str(
@@ -90,34 +89,36 @@ impl Visitor<'_> for SelectorVisitor {
     }
 }
 
-impl RuleSelector {
+impl ErrorCodeSelector {
     /// Return all matching rules, regardless of whether they're in preview.
-    pub fn all_rules(&self) -> impl Iterator<Item = Rule> + '_ {
+    pub fn all_rules(&self) -> impl Iterator<Item = ErrorCode> + '_ {
         match self {
-            RuleSelector::All => RuleSelectorIter::All(Rule::iter()),
+            ErrorCodeSelector::All => ErrorCodeSelectorIter::All(ErrorCode::iter()),
 
-            RuleSelector::Rule(rule) => RuleSelectorIter::Vec(vec![*rule].into_iter()),
+            ErrorCodeSelector::ErrorCode(rule) => {
+                ErrorCodeSelectorIter::Vec(vec![*rule].into_iter())
+            }
         }
     }
 
     /// Returns rules matching the selector, taking into account preview options enabled.
-    pub fn rules<'a>(&'a self) -> impl Iterator<Item = Rule> + 'a {
+    pub fn rules<'a>(&'a self) -> impl Iterator<Item = ErrorCode> + 'a {
         self.all_rules()
     }
 }
 
-pub enum RuleSelectorIter {
-    All(RuleIter),
-    Vec(std::vec::IntoIter<Rule>),
+pub enum ErrorCodeSelectorIter {
+    All(ErrorCodeIter),
+    Vec(std::vec::IntoIter<ErrorCode>),
 }
 
-impl Iterator for RuleSelectorIter {
-    type Item = Rule;
+impl Iterator for ErrorCodeSelectorIter {
+    type Item = ErrorCode;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            RuleSelectorIter::All(iter) => iter.next(),
-            RuleSelectorIter::Vec(iter) => iter.next(),
+            ErrorCodeSelectorIter::All(iter) => iter.next(),
+            ErrorCodeSelectorIter::Vec(iter) => iter.next(),
         }
     }
 }
@@ -130,11 +131,10 @@ mod schema {
     use schemars::schema::{InstanceType, Schema, SchemaObject};
     use strum::IntoEnumIterator;
 
-    use crate::registry::RuleNamespace;
     use crate::rule_selector::{Linter, RuleCodePrefix};
-    use crate::RuleSelector;
+    use crate::ErrorCodeSelector;
 
-    impl JsonSchema for RuleSelector {
+    impl JsonSchema for ErrorCodeSelector {
         fn schema_name() -> String {
             "RuleSelector".to_string()
         }
@@ -181,11 +181,11 @@ mod schema {
     }
 }
 
-impl RuleSelector {
+impl ErrorCodeSelector {
     pub fn specificity(&self) -> Specificity {
         match self {
-            RuleSelector::All => Specificity::All,
-            RuleSelector::Rule { .. } => Specificity::Rule,
+            ErrorCodeSelector::All => Specificity::All,
+            ErrorCodeSelector::ErrorCode { .. } => Specificity::Rule,
         }
     }
 }

@@ -9,7 +9,7 @@ use pyrogen_checker::{
         types::{FilePattern, FilePatternSet, PerFileIgnore},
         CheckerSettings,
     },
-    RuleSelector,
+    ErrorCodeSelector,
 };
 use shellexpand::LookupError;
 use std::{
@@ -25,8 +25,8 @@ use crate::settings::{FileResolverSettings, Settings, EXCLUDE, INCLUDE};
 
 #[derive(Debug, Default)]
 pub struct RuleSelection {
-    pub select: Option<Vec<RuleSelector>>,
-    pub ignore: Vec<RuleSelector>,
+    pub select: Option<Vec<ErrorCodeSelector>>,
+    pub ignore: Vec<ErrorCodeSelector>,
 }
 
 #[derive(Debug, Default)]

@@ -1,8 +1,6 @@
 use std::path::Path;
 
-use pyrogen_diagnostics::Diagnostic;
-
-use crate::settings::CheckerSettings;
+use crate::{registry::Diagnostic, settings::CheckerSettings};
 
 pub(crate) fn check_file_path(
     path: &Path,

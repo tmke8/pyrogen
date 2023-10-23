@@ -12,7 +12,7 @@ use pyrogen_python_trivia::{indentation_at_offset, CommentRanges};
 use pyrogen_source_file::{Locator, TextRangeWrapper};
 
 use crate::fs::relativize_path;
-use crate::registry::Rule;
+use crate::registry::ErrorCode;
 
 /// A directive to ignore a set of rules for a given line of Python source code (e.g.,
 /// `# type: ignore[call-arg]`).
@@ -230,14 +230,14 @@ impl Ranged for Codes<'_> {
 
 /// Returns `true` if the string list of `codes` includes `code` (or an alias
 /// thereof).
-pub(crate) fn includes(needle: Rule, haystack: &[&str]) -> bool {
-    let needle = needle.code();
+pub(crate) fn includes(needle: ErrorCode, haystack: &[&str]) -> bool {
+    let needle = needle.to_str();
     haystack.iter().any(|&candidate| needle == candidate)
 }
 
 /// Returns `true` if the given [`Rule`] is ignored at the specified `lineno`.
 pub(crate) fn rule_is_ignored(
-    code: Rule,
+    code: ErrorCode,
     offset: TextSize,
     noqa_line_for: &NoqaMapping,
     locator: &Locator,
@@ -280,26 +280,17 @@ impl FileExemption {
                     #[allow(deprecated)]
                     let line = locator.compute_line_index(range.start());
                     let path_display = relativize_path(path);
-                    warn!("Invalid `# ruff: noqa` directive at {path_display}:{line}: {err}");
+                    warn!("Invalid `# type: ignore` directive at {path_display}:{line}: {err}");
                 }
-                Ok(Some(exemption)) => {
-                    if indentation_at_offset(range.start(), locator).is_none() {
-                        #[allow(deprecated)]
-                        let line = locator.compute_line_index(range.start());
-                        let path_display = relativize_path(path);
-                        warn!("Unexpected `# ruff: noqa` directive at {path_display}:{line}. File-level suppression comments must appear on their own line.");
-                        continue;
+                Ok(Some(exemption)) => match exemption {
+                    ParsedFileExemption::All => {
+                        return Some(Self::All);
                     }
-
-                    match exemption {
-                        ParsedFileExemption::All => {
-                            return Some(Self::All);
-                        }
-                        ParsedFileExemption::Codes(codes) => {
-                            exempt_codes.extend(codes.into_iter().filter_map(|code| {
-                                if let Ok(rule) = Rule::from_code(code)
+                    ParsedFileExemption::Codes(codes) => {
+                        exempt_codes.extend(codes.into_iter().filter_map(|code| {
+                                if let Ok(error_code) = ErrorCode::from_str(code)
                                 {
-                                    Some(rule.code())
+                                    Some(error_code.to_str())
                                 } else {
                                     #[allow(deprecated)]
                                     let line = locator.compute_line_index(range.start());
@@ -308,9 +299,8 @@ impl FileExemption {
                                     None
                                 }
                             }));
-                        }
                     }
-                }
+                },
                 Ok(None) => {}
             }
         }
@@ -328,9 +318,9 @@ impl FileExemption {
 /// across a source file.
 #[derive(Debug)]
 enum ParsedFileExemption<'a> {
-    /// The file-level exemption ignores all rules (e.g., `# ruff: noqa`).
+    /// The file-level exemption ignores all rules (e.g., `# type: ignore`).
     All,
-    /// The file-level exemption ignores specific rules (e.g., `# ruff: noqa: F401, F841`).
+    /// The file-level exemption ignores specific rules (e.g., `# type: ignore[override]`).
     Codes(Vec<&'a str>),
 }
 

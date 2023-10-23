@@ -18,15 +18,14 @@ use rustpython_parser::text_size::{TextRange, TextSize};
 use similar::TextDiff;
 use thiserror::Error;
 
-use pyrogen_checker::checker::{lint_only, FixTable, FixerResult, LinterResult};
+use pyrogen_checker::checker::{lint_only, CheckerResult, FixTable, FixerResult};
+use pyrogen_checker::fs;
 use pyrogen_checker::logging::DisplayParseError;
 use pyrogen_checker::message::Message;
 use pyrogen_checker::pyproject_toml::lint_pyproject_toml;
-use pyrogen_checker::registry::AsRule;
+use pyrogen_checker::registry::{AsErrorCode, Diagnostic, DiagnosticKind, ErrorCode};
 use pyrogen_checker::settings::{flags, CheckerSettings};
 use pyrogen_checker::source_kind::SourceKind;
-use pyrogen_checker::{fs, IOError, SyntaxError};
-use pyrogen_diagnostics::Diagnostic;
 use pyrogen_macros::CacheKey;
 use pyrogen_python_ast::imports::ImportMap;
 use pyrogen_python_ast::{PySourceType, SourceType, TomlSourceType};
@@ -78,7 +77,7 @@ impl Diagnostics {
         settings: &CheckerSettings,
     ) -> Self {
         let diagnostic = Diagnostic::from(err);
-        if settings.rules.enabled(diagnostic.kind.rule()) {
+        if settings.rules.enabled(diagnostic.kind.error_code()) {
             let name = path.map_or_else(|| "-".into(), std::path::Path::to_string_lossy);
             let dummy = SourceFileBuilder::new(name, "").finish();
             Self::new(
@@ -164,19 +163,13 @@ pub(crate) fn lint_path(
             return Ok(Diagnostics::from_source_error(&err, Some(path), settings));
         }
     };
+    let source_kind = SourceKind::new(source_kind);
 
     // Lint the file.
-    let (
-        LinterResult {
-            data: (messages, imports),
-            error: parse_error,
-        },
-        fixed,
-    ) = {
-        let result = lint_only(path, package, settings, noqa, &source_kind, source_type);
-        let fixed = FxHashMap::default();
-        (result, fixed)
-    };
+    let CheckerResult {
+        data: (messages, imports),
+        error: parse_error,
+    } = lint_only(path, package, settings, noqa, &source_kind, source_type);
 
     let imports = imports.unwrap_or_default();
 
@@ -222,26 +215,20 @@ pub(crate) fn lint_stdin(
             ));
         }
     };
+    let source_kind = SourceKind::new(source_kind);
 
     // Lint the inputs.
-    let (
-        LinterResult {
-            data: (messages, imports),
-            error: parse_error,
-        },
-        fixed,
-    ) = {
-        let result = lint_only(
-            path.unwrap_or_else(|| Path::new("-")),
-            package,
-            &settings.checker,
-            noqa,
-            &source_kind,
-            source_type,
-        );
-        let fixed = FxHashMap::default();
-        (result, fixed)
-    };
+    let CheckerResult {
+        data: (messages, imports),
+        error: parse_error,
+    } = lint_only(
+        path.unwrap_or_else(|| Path::new("-")),
+        package,
+        &settings.checker,
+        noqa,
+        &source_kind,
+        source_type,
+    );
 
     let imports = imports.unwrap_or_default();
 
@@ -292,8 +279,9 @@ impl From<&SourceExtractionError> for Diagnostic {
         match err {
             // IO errors.
             SourceExtractionError::Io(_) => Diagnostic::new(
-                IOError {
-                    message: err.to_string(),
+                DiagnosticKind {
+                    error_code: ErrorCode::IOError,
+                    body: err.to_string(),
                 },
                 TextRange::default(),
             ),

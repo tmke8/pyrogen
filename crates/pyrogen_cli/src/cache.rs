@@ -8,14 +8,15 @@ use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
 
 use anyhow::{Context, Result};
+use pyrogen_checker::registry::DiagnosticKind;
 use serde::{Deserialize, Serialize};
 
 use pyrogen_cache::{CacheKey, CacheKeyHasher};
 use pyrogen_checker::message::Message;
+use pyrogen_checker::registry::ErrorCode;
 use pyrogen_checker::warn_user;
-use pyrogen_diagnostics::DiagnosticKind;
 use pyrogen_python_ast::imports::ImportMap;
-use pyrogen_source_file::SourceFileBuilder;
+use pyrogen_source_file::{CachableTextSize, SourceFileBuilder, TextRangeWrapper};
 use pyrogen_workspace::Settings;
 use rustpython_parser::text_size::{TextRange, TextSize};
 
@@ -207,8 +208,8 @@ impl Cache {
                 );
                 CacheMessage {
                     kind: msg.kind.clone(),
-                    range: msg.range,
-                    noqa_offset: msg.noqa_offset,
+                    range: TextRangeWrapper::wrap(msg.range),
+                    noqa_offset: msg.noqa_offset.into(),
                 }
             })
             .collect();
@@ -272,9 +273,9 @@ impl FileCache {
                 .iter()
                 .map(|msg| Message {
                     kind: msg.kind.clone(),
-                    range: msg.range,
+                    range: msg.range.into(),
                     file: file.clone(),
-                    noqa_offset: msg.noqa_offset,
+                    noqa_offset: msg.noqa_offset.into(),
                 })
                 .collect()
         };
@@ -287,8 +288,8 @@ impl FileCache {
 struct CacheMessage {
     kind: DiagnosticKind,
     /// Range into the message's [`FileCache::source`].
-    range: TextRange,
-    noqa_offset: TextSize,
+    range: TextRangeWrapper,
+    noqa_offset: CachableTextSize,
 }
 
 /// Returns a hash key based on the `package_root`, `settings` and the crate
@@ -400,7 +401,7 @@ mod tests {
                 if diagnostics
                     .messages
                     .iter()
-                    .any(|m| m.kind.name == "SyntaxError")
+                    .any(|m| m.kind.error_code == Rule::SyntaxError)
                 {
                     parse_errors.push(path.clone());
                 }

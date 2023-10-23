@@ -13,7 +13,7 @@ use rustpython_parser::text_size::{TextRange, TextSize};
 use crate::fs::relativize_path;
 use crate::line_width::{LineWidthBuilder, TabSize};
 use crate::message::{Emitter, Message};
-use crate::registry::AsRule;
+use crate::registry::AsErrorCode;
 
 bitflags! {
     #[derive(Default)]
@@ -95,8 +95,8 @@ impl Display for RuleCodeAndBody<'_> {
 
         write!(
             f,
-            "{code} {body}",
-            code = kind.rule().to_string().red().bold(),
+            "{body} [{code}]",
+            code = kind.error_code().to_string().red().bold(),
             body = kind.body,
         )
     }
@@ -155,7 +155,7 @@ impl Display for MessageCodeFrame<'_> {
 
         let char_length = source.text[source.annotation_range].chars().count();
 
-        let label = kind.rule().to_string();
+        let label = kind.error_code().to_string();
 
         let snippet = Snippet {
             title: None,

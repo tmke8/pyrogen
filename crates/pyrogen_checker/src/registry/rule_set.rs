@@ -1,23 +1,23 @@
-use crate::registry::Rule;
+use crate::registry::ErrorCode;
 use pyrogen_macros::CacheKey;
 use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
 
-const RULESET_SIZE: usize = 11;
+const ERRORCODESET_SIZE: usize = 11;
 
-/// A set of [`Rule`]s.
+/// A set of [`ErrorCodes`]s.
 ///
-/// Uses a bitset where a bit of one signals that the Rule with that [u16] is in this set.
+/// Uses a bitset where a bit of one signals that the error code with that [u16] is in this set.
 #[derive(Clone, Default, CacheKey, PartialEq, Eq)]
-pub struct RuleSet([u64; RULESET_SIZE]);
+pub struct ErrorCodeSet([u64; ERRORCODESET_SIZE]);
 
-impl RuleSet {
-    const EMPTY: [u64; RULESET_SIZE] = [0; RULESET_SIZE];
+impl ErrorCodeSet {
+    const EMPTY: [u64; ERRORCODESET_SIZE] = [0; ERRORCODESET_SIZE];
     // 64 fits into a u16 without truncation
     #[allow(clippy::cast_possible_truncation)]
     const SLICE_BITS: u16 = u64::BITS as u16;
 
-    /// Returns an empty rule set.
+    /// Returns an empty error code set.
     pub const fn empty() -> Self {
         Self(Self::EMPTY)
     }
@@ -27,19 +27,19 @@ impl RuleSet {
     }
 
     #[inline]
-    pub const fn from_rule(rule: Rule) -> Self {
-        let rule = rule as u16;
+    pub const fn from_error_code(error_code: ErrorCode) -> Self {
+        let error_code = error_code as u16;
 
-        let index = (rule / Self::SLICE_BITS) as usize;
+        let index = (error_code / Self::SLICE_BITS) as usize;
 
         debug_assert!(
             index < Self::EMPTY.len(),
-            "Rule index out of bounds. Increase the size of the bitset array."
+            "Error code index out of bounds. Increase the size of the bitset array."
         );
 
-        // The bit-position of this specific rule in the slice
-        let shift = rule % Self::SLICE_BITS;
-        // Set the index for that rule to 1
+        // The bit-position of this specific error code in the slice
+        let shift = error_code % Self::SLICE_BITS;
+        // Set the index for that error code to 1
         let mask = 1 << shift;
 
         let mut bits = Self::EMPTY;
@@ -49,14 +49,14 @@ impl RuleSet {
     }
 
     #[inline]
-    pub const fn from_rules(rules: &[Rule]) -> Self {
-        let mut set = RuleSet::empty();
+    pub const fn from_error_codes(error_codes: &[ErrorCode]) -> Self {
+        let mut set = ErrorCodeSet::empty();
 
         let mut i = 0;
 
         // Uses a while because for loops are not allowed in const functions.
-        while i < rules.len() {
-            set = set.union(&RuleSet::from_rule(rules[i]));
+        while i < error_codes.len() {
+            set = set.union(&ErrorCodeSet::from_error_code(error_codes[i]));
             i += 1;
         }
 
@@ -202,9 +202,9 @@ impl RuleSet {
     ///
     /// assert!(set.contains(Rule::AnyType));
     /// ```
-    pub fn insert(&mut self, rule: Rule) {
+    pub fn insert(&mut self, rule: ErrorCode) {
         let set = std::mem::take(self);
-        *self = set.union(&RuleSet::from_rule(rule));
+        *self = set.union(&ErrorCodeSet::from_error_code(rule));
     }
 
     /// Removes `rule` from the set.
@@ -219,9 +219,9 @@ impl RuleSet {
     /// assert!(set.contains(Rule::AnyType));
     /// assert!(!set.contains(Rule::AmbiguousFunctionName));
     /// ```
-    pub fn remove(&mut self, rule: Rule) {
+    pub fn remove(&mut self, rule: ErrorCode) {
         let set = std::mem::take(self);
-        *self = set.subtract(&RuleSet::from_rule(rule));
+        *self = set.subtract(&ErrorCodeSet::from_error_code(rule));
     }
 
     /// Returns `true` if `rule` is in this set.
@@ -234,7 +234,7 @@ impl RuleSet {
     /// assert!(set.contains(Rule::AmbiguousFunctionName));
     /// assert!(!set.contains(Rule::BreakOutsideLoop));
     /// ```
-    pub const fn contains(&self, rule: Rule) -> bool {
+    pub const fn contains(&self, rule: ErrorCode) -> bool {
         let rule = rule as u16;
         let index = rule as usize / Self::SLICE_BITS as usize;
         let shift = rule % Self::SLICE_BITS;
@@ -255,23 +255,23 @@ impl RuleSet {
     ///
     /// assert_eq!(iter, vec![Rule::AnyType, Rule::AmbiguousFunctionName]);
     /// ```
-    pub fn iter(&self) -> RuleSetIterator {
-        RuleSetIterator {
+    pub fn iter(&self) -> ErrorCodeSetIterator {
+        ErrorCodeSetIterator {
             set: self.clone(),
             index: 0,
         }
     }
 }
 
-impl Debug for RuleSet {
+impl Debug for ErrorCodeSet {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_set().entries(self.iter()).finish()
     }
 }
 
-impl FromIterator<Rule> for RuleSet {
-    fn from_iter<T: IntoIterator<Item = Rule>>(iter: T) -> Self {
-        let mut set = RuleSet::empty();
+impl FromIterator<ErrorCode> for ErrorCodeSet {
+    fn from_iter<T: IntoIterator<Item = ErrorCode>>(iter: T) -> Self {
+        let mut set = ErrorCodeSet::empty();
 
         for rule in iter {
             set.insert(rule);
@@ -281,38 +281,38 @@ impl FromIterator<Rule> for RuleSet {
     }
 }
 
-impl Extend<Rule> for RuleSet {
-    fn extend<T: IntoIterator<Item = Rule>>(&mut self, iter: T) {
+impl Extend<ErrorCode> for ErrorCodeSet {
+    fn extend<T: IntoIterator<Item = ErrorCode>>(&mut self, iter: T) {
         let set = std::mem::take(self);
-        *self = set.union(&RuleSet::from_iter(iter));
+        *self = set.union(&ErrorCodeSet::from_iter(iter));
     }
 }
 
-impl IntoIterator for RuleSet {
-    type IntoIter = RuleSetIterator;
-    type Item = Rule;
+impl IntoIterator for ErrorCodeSet {
+    type IntoIter = ErrorCodeSetIterator;
+    type Item = ErrorCode;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl IntoIterator for &RuleSet {
-    type IntoIter = RuleSetIterator;
-    type Item = Rule;
+impl IntoIterator for &ErrorCodeSet {
+    type IntoIter = ErrorCodeSetIterator;
+    type Item = ErrorCode;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-pub struct RuleSetIterator {
-    set: RuleSet,
+pub struct ErrorCodeSetIterator {
+    set: ErrorCodeSet,
     index: u16,
 }
 
-impl Iterator for RuleSetIterator {
-    type Item = Rule;
+impl Iterator for ErrorCodeSetIterator {
+    type Item = ErrorCode;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -321,9 +321,9 @@ impl Iterator for RuleSetIterator {
             #[allow(clippy::cast_possible_truncation)]
             let bit = slice.trailing_zeros() as u16;
 
-            if bit < RuleSet::SLICE_BITS {
+            if bit < ErrorCodeSet::SLICE_BITS {
                 *slice ^= 1 << bit;
-                let rule_value = self.index * RuleSet::SLICE_BITS + bit;
+                let rule_value = self.index * ErrorCodeSet::SLICE_BITS + bit;
                 // SAFETY: RuleSet guarantees that only valid rules are stored in the set.
                 #[allow(unsafe_code)]
                 return Some(unsafe { std::mem::transmute(rule_value) });
@@ -340,27 +340,27 @@ impl Iterator for RuleSetIterator {
     }
 }
 
-impl ExactSizeIterator for RuleSetIterator {}
+impl ExactSizeIterator for ErrorCodeSetIterator {}
 
-impl FusedIterator for RuleSetIterator {}
+impl FusedIterator for ErrorCodeSetIterator {}
 
 #[cfg(test)]
 mod tests {
-    use crate::registry::{Rule, RuleSet};
+    use crate::registry::{ErrorCode, ErrorCodeSet};
     use strum::IntoEnumIterator;
 
     /// Tests that the set can contain all rules
     #[test]
     fn test_all_rules() {
-        for rule in Rule::iter() {
-            let set = RuleSet::from_rule(rule);
+        for rule in ErrorCode::iter() {
+            let set = ErrorCodeSet::from_error_code(rule);
 
             assert!(set.contains(rule));
         }
 
-        let all_rules_set: RuleSet = Rule::iter().collect();
+        let all_rules_set: ErrorCodeSet = ErrorCode::iter().collect();
         let all_rules: Vec<_> = all_rules_set.iter().collect();
-        let expected_rules: Vec<_> = Rule::iter().collect();
+        let expected_rules: Vec<_> = ErrorCode::iter().collect();
         assert_eq!(all_rules, expected_rules);
     }
 }

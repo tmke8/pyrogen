@@ -7,9 +7,10 @@ use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Ranged;
 use rustpython_parser::text_size::{TextRange, TextSize};
 
-use pyrogen_diagnostics::{Diagnostic, DiagnosticKind};
 use pyrogen_source_file::{SourceFile, SourceLocation};
 pub use text::TextEmitter;
+
+use crate::registry::{Diagnostic, DiagnosticKind};
 
 // mod diff;
 mod text;
@@ -108,10 +109,10 @@ mod tests {
     use rustpython_parser::ast::Ranged;
     use rustpython_parser::text_size::{TextRange, TextSize};
 
-    use pyrogen_diagnostics::{Diagnostic, DiagnosticKind, Edit};
     use pyrogen_source_file::SourceFileBuilder;
 
     use crate::message::{Emitter, Message};
+    use crate::registry::{Diagnostic, DiagnosticKind, ErrorCode};
 
     pub(super) fn create_messages() -> Vec<Message> {
         let fib = r#"import os
@@ -130,7 +131,7 @@ def fibonacci(n):
 
         let unused_import = Diagnostic::new(
             DiagnosticKind {
-                name: "UnusedImport".to_string(),
+                error_code: ErrorCode::UnusedImport,
                 body: "`os` imported but unused".to_string(),
             },
             TextRange::new(TextSize::from(7), TextSize::from(9)),
@@ -140,7 +141,7 @@ def fibonacci(n):
 
         let unused_variable = Diagnostic::new(
             DiagnosticKind {
-                name: "UnusedVariable".to_string(),
+                error_code: ErrorCode::UnusedVariable,
                 body: "Local variable `x` is assigned to but never used".to_string(),
             },
             TextRange::new(TextSize::from(94), TextSize::from(95)),
@@ -150,7 +151,7 @@ def fibonacci(n):
 
         let undefined_name = Diagnostic::new(
             DiagnosticKind {
-                name: "UndefinedName".to_string(),
+                error_code: ErrorCode::UndefinedName,
                 body: "Undefined name `a`".to_string(),
             },
             TextRange::new(TextSize::from(3), TextSize::from(4)),

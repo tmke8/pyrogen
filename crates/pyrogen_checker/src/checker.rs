@@ -7,11 +7,12 @@ use colored::Colorize;
 use itertools::Itertools;
 use log::error;
 use rustc_hash::FxHashMap;
+use rustpython_ast::text_size::{TextLen, TextRange};
+use rustpython_ast::TextSize;
 use rustpython_parser::ast::Ranged;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::{Parse, ParseError};
 
-use pyrogen_diagnostics::Diagnostic;
 use pyrogen_python_ast::imports::ImportMap;
 use pyrogen_python_ast::{AsMode, PySourceType};
 use pyrogen_python_index::Indexer;
@@ -24,7 +25,7 @@ use crate::checkers::typecheck::check_ast;
 use crate::directives::Directives;
 use crate::logging::DisplayParseError;
 use crate::message::Message;
-use crate::registry::{AsRule, Rule};
+use crate::registry::{AsErrorCode, Diagnostic, DiagnosticKind, ErrorCode};
 use crate::settings::{flags, CheckerSettings};
 use crate::source_kind::SourceKind;
 use crate::{directives, fs};
@@ -32,26 +33,26 @@ use crate::{directives, fs};
 /// A [`Result`]-like type that returns both data and an error. Used to return
 /// diagnostics even in the face of parse errors, since many diagnostics can be
 /// generated without a full AST.
-pub struct LinterResult<T> {
+pub struct CheckerResult<T> {
     pub data: T,
     pub error: Option<ParseError>,
 }
 
-impl<T> LinterResult<T> {
+impl<T> CheckerResult<T> {
     const fn new(data: T, error: Option<ParseError>) -> Self {
         Self { data, error }
     }
 
-    fn map<U, F: FnOnce(T) -> U>(self, f: F) -> LinterResult<U> {
-        LinterResult::new(f(self.data), self.error)
+    fn map<U, F: FnOnce(T) -> U>(self, f: F) -> CheckerResult<U> {
+        CheckerResult::new(f(self.data), self.error)
     }
 }
 
-pub type FixTable = FxHashMap<Rule, usize>;
+pub type FixTable = FxHashMap<ErrorCode, usize>;
 
 pub struct FixerResult<'a> {
     /// The result returned by the linter, after applying any fixes.
-    pub result: LinterResult<(Vec<Message>, Option<ImportMap>)>,
+    pub result: CheckerResult<(Vec<Message>, Option<ImportMap>)>,
     /// The resulting source code, after applying any fixes.
     pub transformed: Cow<'a, SourceKind>,
     /// The number of fixes applied for each [`Rule`].
@@ -72,7 +73,7 @@ pub fn check_path(
     noqa: flags::Noqa,
     source_kind: &SourceKind,
     source_type: PySourceType,
-) -> LinterResult<(Vec<Diagnostic>, Option<ImportMap>)> {
+) -> CheckerResult<(Vec<Diagnostic>, Option<ImportMap>)> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
     let mut imports = None;
@@ -88,14 +89,10 @@ pub fn check_path(
     }
 
     // Run the AST-based rules.
-    match rustpython_ast::Suite::parse_tokens(
-        tokens,
-        // source_type.as_mode(),
-        &path.to_string_lossy(),
-    ) {
+    match rustpython_parser::parse_tokens(tokens, source_type.as_mode(), &path.to_string_lossy()) {
         Ok(python_ast) => {
             diagnostics.extend(check_ast(
-                &python_ast,
+                &python_ast.expect_module().body,
                 locator,
                 indexer,
                 &directives.noqa_line_for,
@@ -105,26 +102,41 @@ pub fn check_path(
                 package,
                 source_type,
             ));
-            let (import_diagnostics, module_imports) = check_imports(
-                &python_ast,
-                locator,
-                indexer,
-                settings,
-                path,
-                package,
-                source_kind,
-                source_type,
-            );
-            imports = module_imports;
-            diagnostics.extend(import_diagnostics);
+            // let (import_diagnostics, module_imports) = check_imports(
+            //     &python_ast,
+            //     locator,
+            //     indexer,
+            //     settings,
+            //     path,
+            //     package,
+            //     source_kind,
+            //     source_type,
+            // );
+            // imports = module_imports;
+            // diagnostics.extend(import_diagnostics);
         }
         Err(parse_error) => {
             // Always add a diagnostic for the syntax error, regardless of whether
-            // `Rule::SyntaxError` is enabled. We avoid propagating the syntax error
+            // `ErrorCode::SyntaxError` is enabled. We avoid propagating the syntax error
             // if it's disabled via any of the usual mechanisms (e.g., `noqa`,
             // `per-file-ignores`), and the easiest way to detect that suppression is
             // to see if the diagnostic persists to the end of the function.
-            // pycodestyle::rules::syntax_error(&mut diagnostics, &parse_error, locator);
+
+            let rest = locator.after(parse_error.offset);
+            // Try to create a non-empty range so that the diagnostic can print a caret at the
+            // right position. This requires that we retrieve the next character, if any, and take its length
+            // to maintain char-boundaries.
+            let len = rest
+                .chars()
+                .next()
+                .map_or(TextSize::new(0), TextLen::text_len);
+            diagnostics.push(Diagnostic::new(
+                DiagnosticKind {
+                    body: format!("Syntax error: {}", parse_error.error),
+                    error_code: ErrorCode::SyntaxError,
+                },
+                TextRange::at(parse_error.offset, len),
+            ));
             error = Some(parse_error);
         }
     }
@@ -133,7 +145,7 @@ pub fn check_path(
     if !diagnostics.is_empty() && !settings.per_file_ignores.is_empty() {
         let ignores = fs::ignores_from_path(path, &settings.per_file_ignores);
         if !ignores.is_empty() {
-            diagnostics.retain(|diagnostic| !ignores.contains(diagnostic.kind.rule()));
+            diagnostics.retain(|diagnostic| !ignores.contains(diagnostic.kind.error_code()));
         }
     };
 
@@ -166,18 +178,18 @@ pub fn check_path(
         // `noqa` directive, or a `per-file-ignore`), discard it.
         if !diagnostics
             .iter()
-            .any(|diagnostic| diagnostic.kind.rule() == Rule::SyntaxError)
+            .any(|diagnostic| diagnostic.kind.error_code() == ErrorCode::SyntaxError)
         {
             error = None;
         }
 
         // If the syntax error _diagnostic_ is disabled, discard the _diagnostic_.
-        if !settings.rules.enabled(Rule::SyntaxError) {
-            diagnostics.retain(|diagnostic| diagnostic.kind.rule() != Rule::SyntaxError);
+        if !settings.rules.enabled(ErrorCode::SyntaxError) {
+            diagnostics.retain(|diagnostic| diagnostic.kind.error_code() != ErrorCode::SyntaxError);
         }
     }
 
-    LinterResult::new((diagnostics, imports), error)
+    CheckerResult::new((diagnostics, imports), error)
 }
 
 /// Generate a [`Message`] for each [`Diagnostic`] triggered by the given source
@@ -189,7 +201,7 @@ pub fn lint_only(
     noqa: flags::Noqa,
     source_kind: &SourceKind,
     source_type: PySourceType,
-) -> LinterResult<(Vec<Message>, Option<ImportMap>)> {
+) -> CheckerResult<(Vec<Message>, Option<ImportMap>)> {
     // Tokenize once.
     // type Tokens = impl Iterator<Item = LexResult>;
     let tokens = rustpython_parser::lexer::lex(source_kind.source_code(), source_type.as_mode())
@@ -253,7 +265,7 @@ fn diagnostics_to_messages(
         .collect()
 }
 
-fn collect_rule_codes(rules: impl IntoIterator<Item = Rule>) -> String {
+fn collect_rule_codes(rules: impl IntoIterator<Item = ErrorCode>) -> String {
     rules
         .into_iter()
         .map(|rule| rule.to_string())

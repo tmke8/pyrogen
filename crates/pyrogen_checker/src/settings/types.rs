@@ -15,7 +15,7 @@ use strum_macros::EnumIter;
 use pyrogen_cache::{CacheKey, CacheKeyHasher};
 use pyrogen_macros::CacheKey;
 
-use crate::{fs, registry::RuleSet, RuleSelector};
+use crate::{fs, registry::ErrorCodeSet, ErrorCodeSelector};
 
 #[derive(
     Clone,
@@ -168,13 +168,20 @@ impl CacheKey for FilePatternSet {
 pub struct PerFileIgnore {
     pub(crate) basename: String,
     pub(crate) absolute: PathBuf,
-    pub(crate) rules: RuleSet,
+    pub(crate) rules: ErrorCodeSet,
 }
 
 impl PerFileIgnore {
-    pub fn new(pattern: String, prefixes: &[RuleSelector], project_root: Option<&Path>) -> Self {
+    pub fn new(
+        pattern: String,
+        prefixes: &[ErrorCodeSelector],
+        project_root: Option<&Path>,
+    ) -> Self {
         // Rules in preview are included here even if preview mode is disabled; it's safe to ignore disabled rules
-        let rules: RuleSet = prefixes.iter().flat_map(RuleSelector::all_rules).collect();
+        let rules: ErrorCodeSet = prefixes
+            .iter()
+            .flat_map(ErrorCodeSelector::all_rules)
+            .collect();
         let path = Path::new(&pattern);
         let absolute = match project_root {
             Some(project_root) => fs::normalize_path_to(path, project_root),

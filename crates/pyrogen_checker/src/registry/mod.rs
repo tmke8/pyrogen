@@ -1,17 +1,29 @@
-//! Remnant of the registry of all [`Rule`] implementations, now it's reexporting from codes.rs
-//! with some helper symbols
-
-use pyrogen_diagnostics::DiagnosticKind;
+use rustpython_ast::{text_size::TextRange, Ranged, TextSize};
+use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumIter, EnumString, IntoStaticStr};
 
-pub use rule_set::{RuleSet, RuleSetIterator};
+pub use rule_set::{ErrorCodeSet, ErrorCodeSetIterator};
 
 mod rule_set;
 
 #[repr(u16)]
-#[derive(Eq, Hash, Debug, Clone, Copy, PartialEq, Display, EnumString, EnumIter, IntoStaticStr)] // strum macros.
-pub enum Rule {
+#[derive(
+    Eq,
+    Hash,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Display,
+    EnumString,
+    EnumIter,
+    IntoStaticStr,
+    Serialize,
+    Deserialize,
+)]
+pub enum ErrorCode {
     InvalidPyprojectToml,
+
     #[strum(serialize = "override")]
     Override,
 
@@ -26,56 +38,48 @@ pub enum Rule {
 
     #[strum(serialize = "general")]
     GeneralTypeError,
+
+    #[strum(serialize = "unused-import")]
+    UnusedImport,
+
+    #[strum(serialize = "unused-variable")]
+    UnusedVariable,
+
+    #[strum(serialize = "undefined-name")]
+    UndefinedName,
+
+    #[strum(serialize = "io-error")]
+    IOError,
 }
 
-pub trait AsRule {
-    fn rule(&self) -> Rule;
+pub trait AsErrorCode {
+    fn error_code(&self) -> ErrorCode;
 }
 
-impl Rule {
-    pub fn from_code(code: &str) -> Result<Self, FromCodeError> {
+impl ErrorCode {
+    pub fn from_str(code: &str) -> Result<Self, FromCodeError> {
         code.to_owned().parse().map_err(|x| FromCodeError::Unknown)
     }
 
-    pub fn code(&self) -> &'static str {
+    pub fn to_str(&self) -> &'static str {
         self.into()
     }
 }
 
-impl AsRule for DiagnosticKind {
-    fn rule(&self) -> Rule {
-        match Rule::from_code(&self.name) {
-            Ok(rule) => rule,
-            Err(_) => panic!("invalid rule name: {}", self.name),
-        }
+impl AsErrorCode for DiagnosticKind {
+    fn error_code(&self) -> ErrorCode {
+        self.error_code
     }
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum FromCodeError {
-    #[error("unknown rule code")]
+    #[error("unknown error code")]
     Unknown,
 }
 
-pub trait RuleNamespace: Sized {
-    /// Returns the prefix that every single code that ruff uses to identify
-    /// rules from this linter starts with.  In the case that multiple
-    /// `#[prefix]`es are configured for the variant in the `Linter` enum
-    /// definition this is the empty string.
-    fn common_prefix(&self) -> &'static str;
-
-    /// Attempts to parse the given rule code. If the prefix is recognized
-    /// returns the respective variant along with the code with the common
-    /// prefix stripped.
-    fn parse_code(code: &str) -> Option<(Self, &str)>;
-
-    fn name(&self) -> &'static str;
-
-    fn url(&self) -> Option<&'static str>;
-}
-
 #[derive(is_macro::Is, Copy, Clone)]
-pub enum LintSource {
+pub enum CheckerSource {
     Ast,
     Io,
     PhysicalLines,
@@ -87,16 +91,16 @@ pub enum LintSource {
     PyprojectToml,
 }
 
-impl Rule {
+impl ErrorCode {
     /// The source for the diagnostic (either the AST, the filesystem, or the
     /// physical lines).
-    pub const fn lint_source(&self) -> LintSource {
+    pub const fn lint_source(&self) -> CheckerSource {
         match self {
-            Rule::InvalidPyprojectToml => LintSource::PyprojectToml,
-            Rule::UnusedTypeIgnore => LintSource::Noqa,
-            Rule::Override => LintSource::Tokens,
-            Rule::Unreachable => LintSource::LogicalLines,
-            _ => LintSource::Ast,
+            ErrorCode::InvalidPyprojectToml => CheckerSource::PyprojectToml,
+            ErrorCode::UnusedTypeIgnore => CheckerSource::Noqa,
+            ErrorCode::Override => CheckerSource::Tokens,
+            ErrorCode::Unreachable => CheckerSource::LogicalLines,
+            _ => CheckerSource::Ast,
         }
     }
 
@@ -108,17 +112,54 @@ impl Rule {
     // }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct DiagnosticKind {
+    /// The error code that this diagnostic is associated with.
+    pub error_code: ErrorCode,
+    /// The message body to display to the user, to explain the diagnostic.
+    pub body: String,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Diagnostic {
+    pub kind: DiagnosticKind,
+    pub range: TextRange,
+    pub parent: Option<TextSize>,
+}
+
+impl Diagnostic {
+    pub fn new<T: Into<DiagnosticKind>>(kind: T, range: TextRange) -> Self {
+        Self {
+            kind: kind.into(),
+            range,
+            parent: None,
+        }
+    }
+
+    /// Set the location of the diagnostic's parent node.
+    #[inline]
+    pub fn set_parent(&mut self, parent: TextSize) {
+        self.parent = Some(parent);
+    }
+}
+
+impl Ranged for Diagnostic {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
 #[cfg(feature = "clap")]
 pub mod clap_completion {
     use clap::builder::{PossibleValue, TypedValueParser, ValueParserFactory};
     use strum::IntoEnumIterator;
 
-    use crate::registry::Rule;
+    use crate::registry::ErrorCode;
 
     #[derive(Clone)]
     pub struct RuleParser;
 
-    impl ValueParserFactory for Rule {
+    impl ValueParserFactory for ErrorCode {
         type Parser = RuleParser;
 
         fn value_parser() -> Self::Parser {
@@ -127,7 +168,7 @@ pub mod clap_completion {
     }
 
     impl TypedValueParser for RuleParser {
-        type Value = Rule;
+        type Value = ErrorCode;
 
         fn parse_ref(
             &self,
@@ -139,7 +180,7 @@ pub mod clap_completion {
                 .to_str()
                 .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
 
-            Rule::from_code(value).map_err(|_| {
+            ErrorCode::from_str(value).map_err(|_| {
                 let mut error =
                     clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
                 if let Some(arg) = arg {
@@ -157,7 +198,7 @@ pub mod clap_completion {
         }
 
         fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
-            Some(Box::new(Rule::iter().map(|rule| {
+            Some(Box::new(ErrorCode::iter().map(|rule| {
                 let name = rule.to_string();
                 PossibleValue::new(name)
             })))
@@ -171,13 +212,13 @@ mod tests {
 
     use strum::IntoEnumIterator;
 
-    use super::{Rule, RuleNamespace};
+    use super::ErrorCode;
 
     #[test]
     fn check_code_serialization() {
-        for rule in Rule::iter() {
+        for rule in ErrorCode::iter() {
             assert!(
-                Rule::from_code(&format!("{}", rule.to_string())).is_ok(),
+                ErrorCode::from_str(&format!("{}", rule.to_string())).is_ok(),
                 "{rule:?} could not be round-trip serialized."
             );
         }
@@ -185,9 +226,9 @@ mod tests {
 
     #[test]
     fn test_linter_parse_code() {
-        for rule in Rule::iter() {
+        for rule in ErrorCode::iter() {
             let code = format!("{}", rule.to_string());
-            let linter: Rule = code
+            let linter: ErrorCode = code
                 .parse()
                 .unwrap_or_else(|err| panic!("couldn't parse {code:?}"));
         }
@@ -195,6 +236,6 @@ mod tests {
 
     #[test]
     fn rule_size() {
-        assert_eq!(2, size_of::<Rule>());
+        assert_eq!(2, size_of::<ErrorCode>());
     }
 }

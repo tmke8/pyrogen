@@ -1,4 +1,3 @@
-use pyrogen_cli::print_message;
 use std::process::ExitCode;
 
 use clap::Parser;
@@ -12,7 +11,6 @@ pub fn main() -> ExitCode {
     let args = argfile::expand_args_from(args, argfile::parse_fromfile, argfile::PREFIX).unwrap();
 
     let args = Args::parse_from(args);
-    print_message();
     match run(args) {
         Ok(code) => code.into(),
         Err(err) => {
