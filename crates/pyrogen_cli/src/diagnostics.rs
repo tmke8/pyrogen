@@ -77,7 +77,7 @@ impl Diagnostics {
         settings: &CheckerSettings,
     ) -> Self {
         let diagnostic = Diagnostic::from(err);
-        if settings.rules.enabled(diagnostic.kind.error_code()) {
+        if let Some(kind) = settings.table.entry(diagnostic.kind.error_code()) {
             let name = path.map_or_else(|| "-".into(), std::path::Path::to_string_lossy);
             let dummy = SourceFileBuilder::new(name, "").finish();
             Self::new(
@@ -85,6 +85,7 @@ impl Diagnostics {
                     diagnostic,
                     dummy,
                     TextSize::default(),
+                    kind,
                 )],
                 ImportMap::default(),
             )
@@ -93,13 +94,13 @@ impl Diagnostics {
                 Some(path) => {
                     warn!(
                         "{}{}{} {err}",
-                        "Failed to lint ".bold(),
+                        "Failed to check ".bold(),
                         fs::relativize_path(path).bold(),
                         ":".bold()
                     );
                 }
                 None => {
-                    warn!("{}{} {err}", "Failed to lint".bold(), ":".bold());
+                    warn!("{}{} {err}", "Failed to check".bold(), ":".bold());
                 }
             }
 
@@ -130,7 +131,7 @@ pub(crate) fn lint_path(
     let source_type = match SourceType::from(path) {
         SourceType::Toml(TomlSourceType::Pyproject) => {
             let messages = if settings
-                .rules
+                .table
                 .iter_enabled()
                 .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
             {

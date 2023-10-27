@@ -34,6 +34,9 @@ pub(crate) fn check_ast(
     source_type: PySourceType,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
+    if !settings.table.enabled(ErrorCode::GeneralTypeError) {
+        return diagnostics;
+    }
     for stmt in python_ast {
         match stmt {
             Stmt::AnnAssign(StmtAnnAssign {
@@ -48,10 +51,18 @@ pub(crate) fn check_ast(
                         match value {
                             Some(value) => match **value {
                                 Expr::Constant(ref constant) => {
-                                    if let Constant::Int(_) = constant.value {
-                                    } else {
+                                    let value_type: Option<&str> = match constant.value {
+                                        Constant::Bool(_) => Some("bool"),
+                                        Constant::Float(_) => Some("float"),
+                                        Constant::Str(_) => Some("str"),
+                                        Constant::Complex { .. } => Some("complex"),
+                                        Constant::None => Some("None"),
+                                        Constant::Tuple(_) => Some("tuple"),
+                                        _ => None,
+                                    };
+                                    if let Some(value_type) = value_type {
                                         diagnostics.push(Diagnostic::new(
-                                            type_mismatch("int".into(), "str".into()),
+                                            type_mismatch("int".into(), value_type.into()),
                                             range.clone(),
                                         ))
                                     }

@@ -1,0 +1,8 @@
+---
+source: crates/pyrogen_checker/src/message/github.rs
+expression: content
+---
+::warning title=Pyrogen (unused-import),file=fib.py,line=1,col=8,endLine=1,endColumn=10::fib.py:1:8: unused-import `os` imported but unused
+::warning title=Pyrogen (unused-variable),file=fib.py,line=6,col=5,endLine=6,endColumn=6::fib.py:6:5: unused-variable Local variable `x` is assigned to but never used
+::error title=Pyrogen (undefined-name),file=undef.py,line=1,col=4,endLine=1,endColumn=5::undef.py:1:4: undefined-name Undefined name `a`
+

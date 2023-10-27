@@ -8,6 +8,7 @@ use pyrogen_source_file::SourceFile;
 
 use crate::message::Message;
 use crate::registry::{Diagnostic, DiagnosticKind, ErrorCode};
+use crate::settings::code_table::MessageKind;
 use crate::settings::CheckerSettings;
 
 /// Unlike [`pyproject_toml::PyProjectToml`], in our case `build_system` is also optional
@@ -36,7 +37,7 @@ pub fn lint_pyproject_toml(source_file: SourceFile, settings: &CheckerSettings) 
                     "{} is larger than 4GB, but ruff assumes all files to be smaller",
                     source_file.name(),
                 );
-                if settings.rules.enabled(ErrorCode::IOError) {
+                if settings.table.enabled(ErrorCode::IOError) {
                     let diagnostic = Diagnostic::new(
                         DiagnosticKind {
                             error_code: ErrorCode::IOError,
@@ -48,6 +49,7 @@ pub fn lint_pyproject_toml(source_file: SourceFile, settings: &CheckerSettings) 
                         diagnostic,
                         source_file,
                         TextSize::default(),
+                        MessageKind::Error,
                     ));
                 } else {
                     warn!(
@@ -67,7 +69,7 @@ pub fn lint_pyproject_toml(source_file: SourceFile, settings: &CheckerSettings) 
         }
     };
 
-    if settings.rules.enabled(ErrorCode::InvalidPyprojectToml) {
+    if settings.table.enabled(ErrorCode::InvalidPyprojectToml) {
         let toml_err = err.message().to_string();
         let diagnostic = Diagnostic::new(
             DiagnosticKind {
@@ -80,6 +82,7 @@ pub fn lint_pyproject_toml(source_file: SourceFile, settings: &CheckerSettings) 
             diagnostic,
             source_file,
             TextSize::default(),
+            MessageKind::Error,
         ));
     }
 

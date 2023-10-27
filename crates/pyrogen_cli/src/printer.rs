@@ -13,7 +13,7 @@ use serde::Serialize;
 use pyrogen_checker::checker::FixTable;
 use pyrogen_checker::fs::relativize_path;
 use pyrogen_checker::logging::LogLevel;
-use pyrogen_checker::message::{Emitter, TextEmitter};
+use pyrogen_checker::message::{Emitter, GithubEmitter, JsonEmitter, TextEmitter};
 use pyrogen_checker::notify_user;
 use pyrogen_checker::registry::{AsErrorCode, ErrorCode};
 use pyrogen_checker::settings::flags;
@@ -123,6 +123,12 @@ impl Printer {
 
                 self.write_summary_text(writer, diagnostics)?;
             }
+            SerializationFormat::Json => {
+                JsonEmitter.emit(writer, &diagnostics.messages)?;
+            }
+            SerializationFormat::Github => {
+                GithubEmitter.emit(writer, &diagnostics.messages)?;
+            }
         }
 
         writer.flush()?;
@@ -138,7 +144,7 @@ impl Printer {
         let statistics: Vec<ExpandedStatistics> = diagnostics
             .messages
             .iter()
-            .map(|message| (message.kind.error_code(), &message.kind.body))
+            .map(|message| (message.diagnostic.error_code(), &message.diagnostic.body))
             .fold(vec![], |mut acc, (rule, body)| {
                 if let Some((prev_rule, _, count)) = acc.last_mut() {
                     if *prev_rule == rule {
@@ -192,9 +198,9 @@ impl Printer {
                 }
                 return Ok(());
             }
-            // SerializationFormat::Json => {
-            //     writeln!(writer, "{}", serde_json::to_string_pretty(&statistics)?)?;
-            // }
+            SerializationFormat::Json => {
+                writeln!(writer, "{}", serde_json::to_string_pretty(&statistics)?)?;
+            }
             _ => {
                 anyhow::bail!(
                     "Unsupported serialization format for statistics: {:?}",

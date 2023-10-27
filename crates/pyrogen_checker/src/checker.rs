@@ -22,12 +22,13 @@ use crate::checkers::filesystem::check_file_path;
 use crate::checkers::imports::check_imports;
 use crate::checkers::type_ignore::check_type_ignore;
 use crate::checkers::typecheck::check_ast;
-use crate::directives::Directives;
 use crate::logging::DisplayParseError;
 use crate::message::Message;
 use crate::registry::{AsErrorCode, Diagnostic, DiagnosticKind, ErrorCode};
+use crate::settings::code_table::MessageKind;
 use crate::settings::{flags, CheckerSettings};
 use crate::source_kind::SourceKind;
+use crate::type_ignore::NoqaMapping;
 use crate::{directives, fs};
 
 /// A [`Result`]-like type that returns both data and an error. Used to return
@@ -68,7 +69,7 @@ pub fn check_path(
     tokens: impl IntoIterator<Item = LexResult>,
     locator: &Locator,
     indexer: &Indexer,
-    directives: &Directives,
+    noqa_mapping: &NoqaMapping,
     settings: &CheckerSettings,
     noqa: flags::Noqa,
     source_kind: &SourceKind,
@@ -81,9 +82,9 @@ pub fn check_path(
 
     // Run the filesystem-based rules.
     if settings
-        .rules
+        .table
         .iter_enabled()
-        .any(|rule_code| rule_code.lint_source().is_filesystem())
+        .any(|error_code| error_code.lint_source().is_filesystem())
     {
         diagnostics.extend(check_file_path(path, package, settings));
     }
@@ -95,7 +96,7 @@ pub fn check_path(
                 &python_ast.expect_module().body,
                 locator,
                 indexer,
-                &directives.noqa_line_for,
+                &noqa_mapping,
                 settings,
                 noqa,
                 path,
@@ -152,7 +153,7 @@ pub fn check_path(
     // Enforce `noqa` directives.
     if (noqa.into() && !diagnostics.is_empty())
         || settings
-            .rules
+            .table
             .iter_enabled()
             .any(|rule_code| rule_code.lint_source().is_noqa())
     {
@@ -161,7 +162,7 @@ pub fn check_path(
             path,
             locator,
             indexer.comment_ranges(),
-            &directives.noqa_line_for,
+            &noqa_mapping,
             error.is_none(),
             settings,
         );
@@ -184,7 +185,7 @@ pub fn check_path(
         }
 
         // If the syntax error _diagnostic_ is disabled, discard the _diagnostic_.
-        if !settings.rules.enabled(ErrorCode::SyntaxError) {
+        if !settings.table.enabled(ErrorCode::SyntaxError) {
             diagnostics.retain(|diagnostic| diagnostic.kind.error_code() != ErrorCode::SyntaxError);
         }
     }
@@ -214,7 +215,7 @@ pub fn lint_only(
     let indexer = Indexer::from_tokens(&tokens, &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
-    let directives = directives::extract_directives(&tokens, &locator, &indexer);
+    let directives = directives::extract_noqa_line_for(&tokens, &locator, &indexer);
 
     // Generate diagnostics.
     let result = check_path(
@@ -232,7 +233,7 @@ pub fn lint_only(
 
     result.map(|(diagnostics, imports)| {
         (
-            diagnostics_to_messages(diagnostics, path, &locator, &directives),
+            diagnostics_to_messages(&settings, diagnostics, path, &locator, &directives),
             imports,
         )
     })
@@ -240,10 +241,11 @@ pub fn lint_only(
 
 /// Convert from diagnostics to messages.
 fn diagnostics_to_messages(
+    settings: &CheckerSettings,
     diagnostics: Vec<Diagnostic>,
     path: &Path,
     locator: &Locator,
-    directives: &Directives,
+    noqa_mapping: &NoqaMapping,
 ) -> Vec<Message> {
     let file = once_cell::unsync::Lazy::new(|| {
         let mut builder =
@@ -259,8 +261,13 @@ fn diagnostics_to_messages(
     diagnostics
         .into_iter()
         .map(|diagnostic| {
-            let noqa_offset = directives.noqa_line_for.resolve(diagnostic.start());
-            Message::from_diagnostic(diagnostic, file.deref().clone(), noqa_offset)
+            let kind = if settings.table.is_warning(diagnostic.kind.error_code()) {
+                MessageKind::Warning
+            } else {
+                MessageKind::Error
+            };
+            let noqa_offset = noqa_mapping.resolve(diagnostic.start());
+            Message::from_diagnostic(diagnostic, file.deref().clone(), noqa_offset, kind)
         })
         .collect()
 }

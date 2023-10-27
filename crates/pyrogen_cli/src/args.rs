@@ -2,9 +2,11 @@ use std::path::PathBuf;
 
 use clap::{command, Parser};
 
+use pyrogen_checker::code_selector::clap_completion::ErrorCodeSelectorParser;
 use pyrogen_checker::logging::LogLevel;
-use pyrogen_checker::settings::types::{FilePattern, PythonVersion};
-use pyrogen_workspace::configuration::Configuration;
+use pyrogen_checker::settings::types::{FilePattern, PythonVersion, SerializationFormat};
+use pyrogen_checker::ErrorCodeSelector;
+use pyrogen_workspace::configuration::{Configuration, ErrorCodeSelection};
 use pyrogen_workspace::resolver::ConfigurationTransformer;
 
 #[derive(Debug, Parser)]
@@ -34,6 +36,56 @@ pub struct CheckCommand {
     /// configuration.
     #[arg(long, conflicts_with = "isolated")]
     pub config: Option<PathBuf>,
+    /// Comma-separated list of rule codes to enable (or ALL, to enable all rules).
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "ERROR_CODE",
+        value_parser = ErrorCodeSelectorParser,
+        help_heading = "Error code selection",
+        hide_possible_values = true
+    )]
+    pub error: Option<Vec<ErrorCodeSelector>>,
+    /// Comma-separated list of rule codes to enable (or ALL, to enable all rules).
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "ERROR_CODE",
+        value_parser = ErrorCodeSelectorParser,
+        help_heading = "Error code selection",
+        hide_possible_values = true
+    )]
+    pub warning: Option<Vec<ErrorCodeSelector>>,
+    /// Comma-separated list of rule codes to disable.
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "ERROR_CODE",
+        value_parser = ErrorCodeSelectorParser,
+        help_heading = "Error code selection",
+        hide_possible_values = true
+    )]
+    pub ignore: Option<Vec<ErrorCodeSelector>>,
+    /// Like --error, but adds additional rule codes on top of those already specified.
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "ERROR_CODE",
+        value_parser = ErrorCodeSelectorParser,
+        help_heading = "Error code selection",
+        hide_possible_values = true
+    )]
+    pub extend_error: Option<Vec<ErrorCodeSelector>>,
+    /// Like --warning, but adds additional rule codes on top of those already specified.
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "ERROR_CODE",
+        value_parser = ErrorCodeSelectorParser,
+        help_heading = "Error code selection",
+        hide_possible_values = true
+    )]
+    pub extend_warning: Option<Vec<ErrorCodeSelector>>,
     /// List of paths, used to omit files and/or directories from analysis.
     #[arg(
         long,
@@ -42,6 +94,11 @@ pub struct CheckCommand {
         help_heading = "File selection"
     )]
     pub exclude: Option<Vec<FilePattern>>,
+
+    /// Output serialization format for violations.
+    #[arg(long, value_enum, env = "PYROGEN_OUTPUT_FORMAT")]
+    pub output_format: Option<SerializationFormat>,
+
     /// Respect file exclusions via `.gitignore` and other standard ignore files.
     /// Use `--no-respect-gitignore` to disable.
     #[arg(
@@ -144,6 +201,11 @@ impl CheckCommand {
                     self.respect_gitignore,
                     self.no_respect_gitignore,
                 ),
+                error: self.error,
+                extend_error: self.extend_error,
+                warning: self.warning,
+                extend_warning: self.extend_warning,
+                ignore: self.ignore,
                 target_version: self.target_version,
                 // TODO(charlie): Included in `pyproject.toml`, but not inherited.
                 cache_dir: self.cache_dir,
@@ -180,6 +242,11 @@ pub struct CheckArguments {
 pub struct CliOverrides {
     pub exclude: Option<Vec<FilePattern>>,
     pub respect_gitignore: Option<bool>,
+    pub error: Option<Vec<ErrorCodeSelector>>,
+    pub extend_error: Option<Vec<ErrorCodeSelector>>,
+    pub warning: Option<Vec<ErrorCodeSelector>>,
+    pub extend_warning: Option<Vec<ErrorCodeSelector>>,
+    pub ignore: Option<Vec<ErrorCodeSelector>>,
     pub target_version: Option<PythonVersion>,
     // TODO(charlie): Captured in pyproject.toml as a default, but not part of `Settings`.
     pub cache_dir: Option<PathBuf>,
@@ -194,6 +261,13 @@ impl ConfigurationTransformer for CliOverrides {
         if let Some(exclude) = &self.exclude {
             config.exclude = Some(exclude.clone());
         }
+        config.rule_selections.push(ErrorCodeSelection {
+            error: self.error.clone(),
+            warning: self.warning.clone(),
+            ignore: self.ignore.iter().cloned().flatten().collect(),
+            extend_error: self.extend_error.clone().unwrap_or_default(),
+            extend_warning: self.extend_warning.clone().unwrap_or_default(),
+        });
         if let Some(force_exclude) = &self.force_exclude {
             config.force_exclude = Some(*force_exclude);
         }

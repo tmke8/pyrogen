@@ -5,7 +5,7 @@ use crate::CommentRangesBuilder;
 use pyrogen_python_trivia::{
     has_leading_content, has_trailing_content, is_python_whitespace, CommentRanges,
 };
-use pyrogen_source_file::{Locator, TextRangeWrapper};
+use pyrogen_source_file::Locator;
 use rustpython_parser::ast::{Ranged, Stmt};
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::text_size::{TextRange, TextSize};
@@ -30,7 +30,7 @@ impl Indexer {
         let mut line_start = TextSize::default();
 
         for (tok, range) in tokens.iter().flatten() {
-            let trivia = locator.slice(TextRangeWrapper::new(prev_end, range.start()));
+            let trivia = locator.slice(TextRange::new(prev_end, range.start()));
 
             // Get the trivia between the previous and the current token and detect any newlines.
             // This is necessary because `RustPython` doesn't emit `[Tok::Newline]` tokens
@@ -165,7 +165,7 @@ impl Indexer {
         // character on the line, then we can't have a continuation.
         let previous_line_end = locator.line_start(offset);
         if !locator
-            .slice(TextRangeWrapper::new(previous_line_end, offset))
+            .slice(TextRange::new(previous_line_end, offset))
             .chars()
             .all(is_python_whitespace)
         {
@@ -179,7 +179,7 @@ impl Indexer {
         loop {
             let previous_line_end = locator.line_start(continuation);
             if locator
-                .slice(TextRangeWrapper::new(previous_line_end, continuation))
+                .slice(TextRange::new(previous_line_end, continuation))
                 .chars()
                 .all(is_python_whitespace)
             {

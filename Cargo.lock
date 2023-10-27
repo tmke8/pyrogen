@@ -1205,6 +1205,7 @@ dependencies = [
  "rustpython-ast",
  "rustpython-parser",
  "serde",
+ "serde_json",
  "similar",
  "strum",
  "strum_macros",
@@ -1243,6 +1244,7 @@ dependencies = [
  "rayon",
  "rustc-hash",
  "rustpython-parser",
+ "rustpython-parser-vendored",
  "serde",
  "serde_json",
  "shellexpand",
@@ -1311,6 +1313,7 @@ name = "pyrogen_workspace"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "colored",
  "dirs 5.0.1",
  "glob",
  "globset",
@@ -1325,6 +1328,7 @@ dependencies = [
  "rustc-hash",
  "serde",
  "shellexpand",
+ "strum",
  "tempfile",
  "toml 0.8.0",
 ]
@@ -1593,6 +1597,7 @@ checksum = "17ae3062d7fe5fe38073f3a1c7145ed9a04e15f6e4a596d642c7db2d5cd2b51b"
 dependencies = [
  "memchr",
  "once_cell",
+ "serde",
 ]
 
 [[package]]

@@ -9,14 +9,14 @@ use std::time::{Duration, SystemTime};
 
 use anyhow::{Context, Result};
 use pyrogen_checker::registry::DiagnosticKind;
+use pyrogen_checker::settings::code_table::MessageKind;
 use serde::{Deserialize, Serialize};
 
 use pyrogen_cache::{CacheKey, CacheKeyHasher};
 use pyrogen_checker::message::Message;
-use pyrogen_checker::registry::ErrorCode;
 use pyrogen_checker::warn_user;
 use pyrogen_python_ast::imports::ImportMap;
-use pyrogen_source_file::{CachableTextSize, SourceFileBuilder, TextRangeWrapper};
+use pyrogen_source_file::SourceFileBuilder;
 use pyrogen_workspace::Settings;
 use rustpython_parser::text_size::{TextRange, TextSize};
 
@@ -207,9 +207,10 @@ impl Cache {
                     "message uses a different source file"
                 );
                 CacheMessage {
+                    diagnostic: msg.diagnostic.clone(),
+                    range: msg.range,
+                    ignore_offset: msg.ignore_offset.into(),
                     kind: msg.kind.clone(),
-                    range: TextRangeWrapper::wrap(msg.range),
-                    noqa_offset: msg.noqa_offset.into(),
                 }
             })
             .collect();
@@ -272,10 +273,11 @@ impl FileCache {
             self.messages
                 .iter()
                 .map(|msg| Message {
-                    kind: msg.kind.clone(),
+                    diagnostic: msg.diagnostic.clone(),
                     range: msg.range.into(),
                     file: file.clone(),
-                    noqa_offset: msg.noqa_offset.into(),
+                    ignore_offset: msg.ignore_offset.into(),
+                    kind: msg.kind.clone(),
                 })
                 .collect()
         };
@@ -286,10 +288,11 @@ impl FileCache {
 /// On disk representation of a diagnostic message.
 #[derive(Deserialize, Debug, Serialize)]
 struct CacheMessage {
-    kind: DiagnosticKind,
+    diagnostic: DiagnosticKind,
     /// Range into the message's [`FileCache::source`].
-    range: TextRangeWrapper,
-    noqa_offset: CachableTextSize,
+    range: TextRange,
+    ignore_offset: TextSize,
+    kind: MessageKind,
 }
 
 /// Returns a hash key based on the `package_root`, `settings` and the crate
@@ -401,7 +404,7 @@ mod tests {
                 if diagnostics
                     .messages
                     .iter()
-                    .any(|m| m.kind.error_code == Rule::SyntaxError)
+                    .any(|m| m.diagnostic.error_code == Rule::SyntaxError)
                 {
                     parse_errors.push(path.clone());
                 }

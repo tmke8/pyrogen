@@ -9,18 +9,12 @@ use pyrogen_source_file::Locator;
 
 use crate::type_ignore::NoqaMapping;
 
-pub struct Directives {
-    pub noqa_line_for: NoqaMapping,
-}
-
-pub fn extract_directives(lxr: &[LexResult], locator: &Locator, indexer: &Indexer) -> Directives {
-    Directives {
-        noqa_line_for: extract_noqa_line_for(lxr, locator, indexer),
-    }
-}
-
 /// Extract a mapping from logical line to noqa line.
-fn extract_noqa_line_for(lxr: &[LexResult], locator: &Locator, indexer: &Indexer) -> NoqaMapping {
+pub fn extract_noqa_line_for(
+    lxr: &[LexResult],
+    locator: &Locator,
+    indexer: &Indexer,
+) -> NoqaMapping {
     let mut string_mappings = Vec::new();
 
     for (tok, range) in lxr.iter().flatten() {

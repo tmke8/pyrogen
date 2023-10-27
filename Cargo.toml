@@ -50,8 +50,10 @@ rustpython-ast = { version = "0.3.0", features = [
 ] }
 rustpython-parser = { version = "0.3.0", features = [
     "full-lexer",
+    "serde",
     "location",
     "malachite-bigint",
     "all-nodes-with-ranges",
 ] }
+rustpython-parser-vendored = { version = "0.3.0", features = ["serde"] }
 test-case = { version = "3.2.1" }

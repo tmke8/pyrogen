@@ -57,7 +57,48 @@ pub struct Options {
             select = ["E", "F", "B", "Q"]
         "#
     )]
-    pub select: Option<Vec<ErrorCodeSelector>>,
+    pub warning: Option<Vec<ErrorCodeSelector>>,
+
+    /// A list of rule codes or prefixes to enable, in addition to those
+    /// specified by `error`.
+    #[option(
+        default = "[]",
+        value_type = "list[RuleSelector]",
+        example = r#"
+            # On top of the default `select` (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
+            extend-select = ["B", "Q"]
+        "#
+    )]
+    pub extend_warning: Option<Vec<ErrorCodeSelector>>,
+
+    /// A list of rule codes or prefixes to enable. Prefixes can specify exact
+    /// rules (like `F841`), entire categories (like `F`), or anything in
+    /// between.
+    ///
+    /// When breaking ties between enabled and disabled rules (via `select` and
+    /// `ignore`, respectively), more specific prefixes override less
+    /// specific prefixes.
+    #[option(
+        default = r#"["E", "F"]"#,
+        value_type = "list[RuleSelector]",
+        example = r#"
+            # On top of the defaults (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
+            select = ["E", "F", "B", "Q"]
+        "#
+    )]
+    pub error: Option<Vec<ErrorCodeSelector>>,
+
+    /// A list of rule codes or prefixes to enable, in addition to those
+    /// specified by `error`.
+    #[option(
+        default = "[]",
+        value_type = "list[RuleSelector]",
+        example = r#"
+            # On top of the default `select` (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
+            extend-select = ["B", "Q"]
+        "#
+    )]
+    pub extend_error: Option<Vec<ErrorCodeSelector>>,
 
     // Tables are required to go last.
     /// A list of mappings from file pattern to rule codes or prefixes to

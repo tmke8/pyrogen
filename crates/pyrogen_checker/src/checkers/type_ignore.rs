@@ -11,7 +11,7 @@ use pyrogen_source_file::Locator;
 use crate::registry::{AsErrorCode, Diagnostic, DiagnosticKind, ErrorCode};
 use crate::settings::CheckerSettings;
 use crate::type_ignore;
-use crate::type_ignore::{Directive, FileExemption, NoqaDirectives, NoqaMapping};
+use crate::type_ignore::{Directive, FileExemption, NoqaMapping, TypeIgnores};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct UnusedCodes {
@@ -40,7 +40,7 @@ pub(crate) fn check_type_ignore(
     let exemption = FileExemption::try_extract(locator.contents(), comment_ranges, path, locator);
 
     // Extract all `noqa` directives.
-    let mut noqa_directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
+    let mut noqa_directives = TypeIgnores::from_commented_ranges(comment_ranges, path, locator);
 
     // Indices of diagnostics that were ignored by a `noqa` directive.
     let mut ignored_diagnostics = vec![];
@@ -103,7 +103,7 @@ pub(crate) fn check_type_ignore(
 
     // Enforce that the noqa directive was actually used (RUF100), unless RUF100 was itself
     // suppressed.
-    if settings.rules.enabled(ErrorCode::UnusedTypeIgnore)
+    if settings.table.enabled(ErrorCode::UnusedTypeIgnore)
         && analyze_directives
         && !exemption.is_some_and(|exemption| match exemption {
             FileExemption::All => true,
@@ -135,7 +135,7 @@ pub(crate) fn check_type_ignore(
                             valid_codes.push(code);
                         } else {
                             if let Ok(rule) = ErrorCode::from_str(code) {
-                                if settings.rules.enabled(rule) {
+                                if settings.table.enabled(rule) {
                                     unmatched_codes.push(code);
                                 } else {
                                     disabled_codes.push(code);

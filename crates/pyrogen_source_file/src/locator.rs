@@ -452,8 +452,8 @@ impl<'a> Locator<'a> {
 
     /// Take the source code between the given [`TextRange`].
     #[inline]
-    pub fn slice<T: Ranged>(&self, ranged: T) -> &'a str {
-        &self.contents[ranged.range()]
+    pub fn slice(&self, range: TextRange) -> &'a str {
+        &self.contents[range]
     }
 
     /// Return the underlying source code.

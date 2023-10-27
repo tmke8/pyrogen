@@ -42,6 +42,7 @@ path-absolutize = { workspace = true, features = ["once_cell_cache"] }
 rayon = { version = "1.8.0" }
 rustc-hash = { workspace = true }
 rustpython-parser = { workspace = true }
+rustpython-parser-vendored = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 shellexpand = { workspace = true }

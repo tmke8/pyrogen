@@ -1,0 +1,51 @@
+---
+source: crates/pyrogen_checker/src/message/json.rs
+expression: content
+---
+[
+  {
+    "code": "unused-import",
+    "end_location": {
+      "column": 10,
+      "row": 1
+    },
+    "filename": "fib.py",
+    "kind": "warning",
+    "location": {
+      "column": 8,
+      "row": 1
+    },
+    "message": "`os` imported but unused",
+    "type_ignore_row": 1
+  },
+  {
+    "code": "unused-variable",
+    "end_location": {
+      "column": 6,
+      "row": 6
+    },
+    "filename": "fib.py",
+    "kind": "warning",
+    "location": {
+      "column": 5,
+      "row": 6
+    },
+    "message": "Local variable `x` is assigned to but never used",
+    "type_ignore_row": 6
+  },
+  {
+    "code": "undefined-name",
+    "end_location": {
+      "column": 5,
+      "row": 1
+    },
+    "filename": "undef.py",
+    "kind": "error",
+    "location": {
+      "column": 4,
+      "row": 1
+    },
+    "message": "Undefined name `a`",
+    "type_ignore_row": 1
+  }
+]

@@ -68,9 +68,9 @@ impl ErrorCodeSet {
     /// ## Examples
     ///
     /// ```rust
-    /// # use ruff_linter::registry::{Rule, RuleSet};
-    /// let set_1 = RuleSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::AnyType]);
-    /// let set_2 = RuleSet::from_rules(&[
+    /// # use ruff_linter::registry::{Rule, ErrorCodeSet};
+    /// let set_1 = ErrorCodeSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::AnyType]);
+    /// let set_2 = ErrorCodeSet::from_rules(&[
     ///     Rule::BadQuotesInlineString,
     ///     Rule::BooleanPositionalValueInCall,
     /// ]);
@@ -98,9 +98,9 @@ impl ErrorCodeSet {
     ///
     /// ## Examples
     /// ```rust
-    /// # use ruff_linter::registry::{Rule, RuleSet};
-    /// let set_1 = RuleSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::AnyType]);
-    /// let set_2 = RuleSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::Debugger]);
+    /// # use ruff_linter::registry::{Rule, ErrorCodeSet};
+    /// let set_1 = ErrorCodeSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::AnyType]);
+    /// let set_2 = ErrorCodeSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::Debugger]);
     ///
     /// let subtract = set_1.subtract(&set_2);
     ///
@@ -123,15 +123,15 @@ impl ErrorCodeSet {
     ///
     /// ## Examples
     /// ```rust
-    /// # use ruff_linter::registry::{Rule, RuleSet};
-    /// let set_1 = RuleSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::AnyType]);
+    /// # use ruff_linter::registry::{Rule, ErrorCodeSet};
+    /// let set_1 = ErrorCodeSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::AnyType]);
     ///
-    /// assert!(set_1.intersects(&RuleSet::from_rules(&[
+    /// assert!(set_1.intersects(&ErrorCodeSet::from_rules(&[
     ///     Rule::AnyType,
     ///     Rule::BadQuotesInlineString
     /// ])));
     ///
-    /// assert!(!set_1.intersects(&RuleSet::from_rules(&[
+    /// assert!(!set_1.intersects(&ErrorCodeSet::from_rules(&[
     ///     Rule::BooleanPositionalValueInCall,
     ///     Rule::BadQuotesInlineString
     /// ])));
@@ -154,10 +154,10 @@ impl ErrorCodeSet {
     /// ## Examples
     ///
     /// ```rust
-    /// # use ruff_linter::registry::{Rule, RuleSet};
-    /// assert!(RuleSet::empty().is_empty());
+    /// # use ruff_linter::registry::{Rule, ErrorCodeSet};
+    /// assert!(ErrorCodeSet::empty().is_empty());
     ///         assert!(
-    ///             !RuleSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::BadQuotesInlineString])
+    ///             !ErrorCodeSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::BadQuotesInlineString])
     ///                 .is_empty()
     ///         );
     /// ```
@@ -170,10 +170,10 @@ impl ErrorCodeSet {
     /// ## Examples
     ///
     /// ```rust
-    /// # use ruff_linter::registry::{Rule, RuleSet};
-    /// assert_eq!(RuleSet::empty().len(), 0);
+    /// # use ruff_linter::registry::{Rule, ErrorCodeSet};
+    /// assert_eq!(ErrorCodeSet::empty().len(), 0);
     /// assert_eq!(
-    ///     RuleSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::BadQuotesInlineString]).len(),
+    ///     ErrorCodeSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::BadQuotesInlineString]).len(),
     ///     2
     /// );
     pub const fn len(&self) -> usize {
@@ -193,8 +193,8 @@ impl ErrorCodeSet {
     ///
     /// ## Examples
     /// ```rust
-    /// # use ruff_linter::registry::{Rule, RuleSet};
-    /// let mut set = RuleSet::empty();
+    /// # use ruff_linter::registry::{Rule, ErrorCodeSet};
+    /// let mut set = ErrorCodeSet::empty();
     ///
     /// assert!(!set.contains(Rule::AnyType));
     ///
@@ -211,8 +211,8 @@ impl ErrorCodeSet {
     ///
     /// ## Examples
     /// ```rust
-    /// # use ruff_linter::registry::{Rule, RuleSet};
-    /// let mut set = RuleSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::AnyType]);
+    /// # use ruff_linter::registry::{Rule, ErrorCodeSet};
+    /// let mut set = ErrorCodeSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::AnyType]);
     ///
     /// set.remove(Rule::AmbiguousFunctionName);
     ///
@@ -228,8 +228,8 @@ impl ErrorCodeSet {
     ///
     /// ## Examples
     /// ```rust
-    /// # use ruff_linter::registry::{Rule, RuleSet};
-    /// let set = RuleSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::AnyType]);
+    /// # use ruff_linter::registry::{Rule, ErrorCodeSet};
+    /// let set = ErrorCodeSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::AnyType]);
     ///
     /// assert!(set.contains(Rule::AmbiguousFunctionName));
     /// assert!(!set.contains(Rule::BreakOutsideLoop));
@@ -248,8 +248,8 @@ impl ErrorCodeSet {
     /// ## Examples
     ///
     /// ```rust
-    /// # use ruff_linter::registry::{Rule, RuleSet};
-    /// let set = RuleSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::AnyType]);
+    /// # use ruff_linter::registry::{Rule, ErrorCodeSet};
+    /// let set = ErrorCodeSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::AnyType]);
     ///
     /// let iter: Vec<_> = set.iter().collect();
     ///
@@ -324,7 +324,7 @@ impl Iterator for ErrorCodeSetIterator {
             if bit < ErrorCodeSet::SLICE_BITS {
                 *slice ^= 1 << bit;
                 let rule_value = self.index * ErrorCodeSet::SLICE_BITS + bit;
-                // SAFETY: RuleSet guarantees that only valid rules are stored in the set.
+                // SAFETY: ErrorCodeSet guarantees that only valid rules are stored in the set.
                 #[allow(unsafe_code)]
                 return Some(unsafe { std::mem::transmute(rule_value) });
             }
