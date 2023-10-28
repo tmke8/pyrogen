@@ -3,7 +3,6 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use std::ops::Deref;
 
-use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Ranged;
 use rustpython_parser::text_size::{TextRange, TextSize};
 
@@ -114,7 +113,6 @@ pub trait Emitter {
 
 #[cfg(test)]
 mod tests {
-    use rustc_hash::FxHashMap;
     use rustpython_parser::ast::Ranged;
     use rustpython_parser::text_size::{TextRange, TextSize};
 

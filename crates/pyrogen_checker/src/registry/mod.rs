@@ -57,9 +57,9 @@ pub trait AsErrorCode {
 }
 
 impl ErrorCode {
-    pub fn from_str(code: &str) -> Result<Self, FromCodeError> {
-        code.to_owned().parse().map_err(|x| FromCodeError::Unknown)
-    }
+    // pub fn from_str(code: &str) -> Result<Self, FromCodeError> {
+    //     code.to_owned().parse().map_err(|x| FromCodeError::Unknown)
+    // }
 
     pub fn to_str(&self) -> &'static str {
         self.into()
@@ -153,6 +153,7 @@ impl Ranged for Diagnostic {
 #[cfg(feature = "clap")]
 pub mod clap_completion {
     use clap::builder::{PossibleValue, TypedValueParser, ValueParserFactory};
+    use std::str::FromStr;
     use strum::IntoEnumIterator;
 
     use crate::registry::ErrorCode;
@@ -210,6 +211,7 @@ pub mod clap_completion {
 #[cfg(test)]
 mod tests {
     use std::mem::size_of;
+    use std::str::FromStr;
 
     use strum::IntoEnumIterator;
 
@@ -219,7 +221,7 @@ mod tests {
     fn check_code_serialization() {
         for error_code in ErrorCode::iter() {
             assert!(
-                ErrorCode::from_str(&format!("{}", error_code.to_string())).is_ok(),
+                ErrorCode::from_str(&format!("{}", error_code)).is_ok(),
                 "{error_code:?} could not be round-trip serialized."
             );
         }
@@ -228,7 +230,7 @@ mod tests {
     #[test]
     fn test_linter_parse_code() {
         for error_code in ErrorCode::iter() {
-            let code = format!("{}", error_code.to_string());
+            let code = format!("{}", error_code);
             let linter: ErrorCode = code
                 .parse()
                 .unwrap_or_else(|err| panic!("couldn't parse {code:?}"));

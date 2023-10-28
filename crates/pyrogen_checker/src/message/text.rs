@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 use std::io::Write;
 
 use annotate_snippets::display_list::{DisplayList, FormatOptions};
-use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
+use annotate_snippets::snippet::{AnnotationType, Slice, Snippet, SourceAnnotation};
 use bitflags::bitflags;
 use colored::Colorize;
 
@@ -19,10 +19,6 @@ use crate::settings::code_table::MessageKind;
 bitflags! {
     #[derive(Default)]
     struct EmitterFlags: u8 {
-        /// Whether to show the fix status of a diagnostic.
-        const SHOW_FIX_STATUS = 0b0000_0001;
-        /// Whether to show the diff of a fix, for diagnostics that have a fix.
-        const SHOW_FIX_DIFF   = 0b0000_0010;
         /// Whether to show the source code of a diagnostic.
         const SHOW_SOURCE     = 0b0000_0100;
     }
@@ -34,19 +30,6 @@ pub struct TextEmitter {
 }
 
 impl TextEmitter {
-    #[must_use]
-    pub fn with_show_fix_status(mut self, show_fix_status: bool) -> Self {
-        self.flags
-            .set(EmitterFlags::SHOW_FIX_STATUS, show_fix_status);
-        self
-    }
-
-    #[must_use]
-    pub fn with_show_fix_diff(mut self, show_fix_diff: bool) -> Self {
-        self.flags.set(EmitterFlags::SHOW_FIX_DIFF, show_fix_diff);
-        self
-    }
-
     #[must_use]
     pub fn with_show_source(mut self, show_source: bool) -> Self {
         self.flags.set(EmitterFlags::SHOW_SOURCE, show_source);
@@ -263,16 +246,6 @@ mod tests {
     #[test]
     fn default() {
         let mut emitter = TextEmitter::default().with_show_source(true);
-        let content = capture_emitter_output(&mut emitter, &create_messages());
-
-        assert_snapshot!(content);
-    }
-
-    #[test]
-    fn fix_status() {
-        let mut emitter = TextEmitter::default()
-            .with_show_fix_status(true)
-            .with_show_source(true);
         let content = capture_emitter_output(&mut emitter, &create_messages());
 
         assert_snapshot!(content);

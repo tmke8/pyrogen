@@ -338,17 +338,16 @@ pub fn python_files_in_path(
                         {
                             debug!("Ignored path via `exclude`: {:?}", path);
                             return WalkState::Skip;
+                        } else if !settings.file_resolver.extend_exclude.is_empty()
+                            && match_exclusion(
+                                path,
+                                file_name,
+                                &settings.file_resolver.extend_exclude,
+                            )
+                        {
+                            debug!("Ignored path via `extend-exclude`: {:?}", path);
+                            return WalkState::Skip;
                         }
-                        // else if !settings.file_resolver.extend_exclude.is_empty()
-                        //     && match_exclusion(
-                        //         path,
-                        //         file_name,
-                        //         &settings.file_resolver.extend_exclude,
-                        //     )
-                        // {
-                        //     debug!("Ignored path via `extend-exclude`: {:?}", path);
-                        //     return WalkState::Skip;
-                        // }
                     } else {
                         debug!("Ignored path due to error in parsing: {:?}", path);
                         return WalkState::Skip;
@@ -470,13 +469,12 @@ fn is_file_excluded(
             {
                 debug!("Ignored path via `exclude`: {:?}", path);
                 return true;
+            } else if !settings.file_resolver.extend_exclude.is_empty()
+                && match_exclusion(path, file_name, &settings.file_resolver.extend_exclude)
+            {
+                debug!("Ignored path via `extend-exclude`: {:?}", path);
+                return true;
             }
-            // else if !settings.file_resolver.extend_exclude.is_empty()
-            //     && match_exclusion(path, file_name, &settings.file_resolver.extend_exclude)
-            // {
-            //     debug!("Ignored path via `extend-exclude`: {:?}", path);
-            //     return true;
-            // }
         } else {
             debug!("Ignored path due to error in parsing: {:?}", path);
             return true;

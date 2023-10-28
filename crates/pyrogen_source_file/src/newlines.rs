@@ -22,7 +22,7 @@ impl UniversalNewlines for str {
 /// ## Examples
 ///
 /// ```rust
-/// # use pyrogen_text_size::TextSize;
+/// # use rustpython_parser::text_size::TextSize;
 /// # use pyrogen_source_file::{Line, UniversalNewlineIterator};
 /// let mut lines = UniversalNewlineIterator::from("foo\nbar\n\r\nbaz\rbop");
 ///

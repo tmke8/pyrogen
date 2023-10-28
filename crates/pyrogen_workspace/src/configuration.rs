@@ -10,7 +10,7 @@ use std::{
 use strum::IntoEnumIterator;
 
 use pyrogen_cache::cache_dir;
-use pyrogen_checker::settings::types::PythonVersion;
+use pyrogen_checker::settings::types::{PythonVersion, SerializationFormat};
 use pyrogen_checker::{
     code_selector::Specificity,
     fs,
@@ -42,7 +42,9 @@ pub struct Configuration {
     pub per_file_ignores: Option<Vec<PerFileIgnore>>,
     pub cache_dir: Option<PathBuf>,
     pub exclude: Option<Vec<FilePattern>>,
+    pub extend_exclude: Vec<FilePattern>,
     pub force_exclude: Option<bool>,
+    pub output_format: Option<SerializationFormat>,
     pub include: Option<Vec<FilePattern>>,
     pub respect_gitignore: Option<bool>,
     pub target_version: Option<PythonVersion>,
@@ -65,6 +67,7 @@ impl Configuration {
                 exclude: FilePatternSet::try_from_iter(
                     self.exclude.unwrap_or_else(|| EXCLUDE.to_vec()),
                 )?,
+                extend_exclude: FilePatternSet::try_from_iter(self.extend_exclude)?,
                 force_exclude: self.force_exclude.unwrap_or(false),
                 include: FilePatternSet::try_from_iter(
                     self.include.unwrap_or_else(|| INCLUDE.to_vec()),
@@ -81,10 +84,11 @@ impl Configuration {
                         .into_iter()
                         .collect(),
                 )?,
-                target_version: target_version,
+                target_version,
                 namespace_packages: self.namespace_packages.unwrap_or_default(),
                 src: self.src.unwrap_or_else(|| vec![project_root.to_path_buf()]),
             },
+            output_format: self.output_format.unwrap_or_default(),
         })
     }
 
@@ -122,6 +126,19 @@ impl Configuration {
                     })
                     .collect()
             }),
+            extend_exclude: options
+                .extend_exclude
+                .map(|paths| {
+                    paths
+                        .into_iter()
+                        .map(|pattern| {
+                            let absolute = fs::normalize_path_to(&pattern, project_root);
+                            FilePattern::User(pattern, absolute)
+                        })
+                        .collect()
+                })
+                .unwrap_or_default(),
+            output_format: options.output_format,
             force_exclude: options.force_exclude,
             include: options.include.map(|paths| {
                 paths
@@ -156,6 +173,12 @@ impl Configuration {
             per_file_ignores: self.per_file_ignores.or(config.per_file_ignores),
             cache_dir: self.cache_dir.or(config.cache_dir),
             exclude: self.exclude.or(config.exclude),
+            extend_exclude: config
+                .extend_exclude
+                .into_iter()
+                .chain(self.extend_exclude)
+                .collect(),
+            output_format: self.output_format.or(config.output_format),
             force_exclude: self.force_exclude.or(config.force_exclude),
             include: self.include.or(config.include),
             namespace_packages: self.namespace_packages.or(config.namespace_packages),

@@ -2,16 +2,13 @@ use std::borrow::Cow;
 use std::ops::Deref;
 use std::path::Path;
 
-use anyhow::{anyhow, Result};
-use colored::Colorize;
 use itertools::Itertools;
-use log::error;
 use rustc_hash::FxHashMap;
 use rustpython_ast::text_size::{TextLen, TextRange};
 use rustpython_ast::TextSize;
 use rustpython_parser::ast::Ranged;
 use rustpython_parser::lexer::LexResult;
-use rustpython_parser::{Parse, ParseError};
+use rustpython_parser::ParseError;
 
 use pyrogen_python_ast::imports::ImportMap;
 use pyrogen_python_ast::{AsMode, PySourceType};
@@ -19,16 +16,14 @@ use pyrogen_python_index::Indexer;
 use pyrogen_source_file::{Locator, SourceFileBuilder};
 
 use crate::checkers::filesystem::check_file_path;
-use crate::checkers::imports::check_imports;
 use crate::checkers::type_ignore::check_type_ignore;
 use crate::checkers::typecheck::check_ast;
-use crate::logging::DisplayParseError;
 use crate::message::Message;
 use crate::registry::{AsErrorCode, Diagnostic, DiagnosticKind, ErrorCode};
 use crate::settings::code_table::MessageKind;
 use crate::settings::{flags, CheckerSettings};
 use crate::source_kind::SourceKind;
-use crate::type_ignore::NoqaMapping;
+use crate::type_ignore::TypeIgnoreMapping;
 use crate::{directives, fs};
 
 /// A [`Result`]-like type that returns both data and an error. Used to return
@@ -69,15 +64,15 @@ pub fn check_path(
     tokens: impl IntoIterator<Item = LexResult>,
     locator: &Locator,
     indexer: &Indexer,
-    noqa_mapping: &NoqaMapping,
+    noqa_mapping: &TypeIgnoreMapping,
     settings: &CheckerSettings,
-    noqa: flags::Noqa,
+    noqa: flags::TypeIgnore,
     source_kind: &SourceKind,
     source_type: PySourceType,
 ) -> CheckerResult<(Vec<Diagnostic>, Option<ImportMap>)> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
-    let mut imports = None;
+    let imports = None;
     let mut error = None;
 
     // Run the filesystem-based rules.
@@ -96,7 +91,7 @@ pub fn check_path(
                 &python_ast.expect_module().body,
                 locator,
                 indexer,
-                &noqa_mapping,
+                noqa_mapping,
                 settings,
                 noqa,
                 path,
@@ -162,7 +157,7 @@ pub fn check_path(
             path,
             locator,
             indexer.comment_ranges(),
-            &noqa_mapping,
+            noqa_mapping,
             error.is_none(),
             settings,
         );
@@ -199,7 +194,7 @@ pub fn lint_only(
     path: &Path,
     package: Option<&Path>,
     settings: &CheckerSettings,
-    noqa: flags::Noqa,
+    noqa: flags::TypeIgnore,
     source_kind: &SourceKind,
     source_type: PySourceType,
 ) -> CheckerResult<(Vec<Message>, Option<ImportMap>)> {
@@ -233,7 +228,7 @@ pub fn lint_only(
 
     result.map(|(diagnostics, imports)| {
         (
-            diagnostics_to_messages(&settings, diagnostics, path, &locator, &directives),
+            diagnostics_to_messages(settings, diagnostics, path, &locator, &directives),
             imports,
         )
     })
@@ -245,7 +240,7 @@ fn diagnostics_to_messages(
     diagnostics: Vec<Diagnostic>,
     path: &Path,
     locator: &Locator,
-    noqa_mapping: &NoqaMapping,
+    noqa_mapping: &TypeIgnoreMapping,
 ) -> Vec<Message> {
     let file = once_cell::unsync::Lazy::new(|| {
         let mut builder =

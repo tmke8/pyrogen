@@ -9,7 +9,7 @@ use log::Level;
 use once_cell::sync::Lazy;
 use rustpython_parser::{ParseError, ParseErrorType};
 
-use pyrogen_source_file::{OneIndexed, SourceCode, SourceLocation};
+use pyrogen_source_file::SourceCode;
 
 use crate::fs;
 use crate::source_kind::SourceKind;
@@ -231,15 +231,13 @@ impl Display for TruncateAtNewline<'_> {
             fn write_str(&mut self, s: &str) -> std::fmt::Result {
                 if self.after_new_line {
                     Ok(())
+                } else if let Some(end) = s.find(['\n', '\r']) {
+                    self.inner.write_str(&s[..end])?;
+                    self.inner.write_str("\u{23ce}...")?;
+                    self.after_new_line = true;
+                    Ok(())
                 } else {
-                    if let Some(end) = s.find(['\n', '\r']) {
-                        self.inner.write_str(&s[..end])?;
-                        self.inner.write_str("\u{23ce}...")?;
-                        self.after_new_line = true;
-                        Ok(())
-                    } else {
-                        self.inner.write_str(s)
-                    }
+                    self.inner.write_str(s)
                 }
             }
         }

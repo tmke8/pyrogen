@@ -7,7 +7,7 @@ pub(crate) fn check_file_path(
     package: Option<&Path>,
     settings: &CheckerSettings,
 ) -> Vec<Diagnostic> {
-    let mut diagnostics: Vec<Diagnostic> = vec![];
+    let diagnostics: Vec<Diagnostic> = vec![];
 
     diagnostics
 }

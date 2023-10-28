@@ -128,16 +128,13 @@ pub struct ModuleImport {
 
 impl ModuleImport {
     pub fn new(module: String, range: TextRange) -> Self {
-        Self {
-            module,
-            range: range,
-        }
+        Self { module, range }
     }
 }
 
 impl From<&ModuleImport> for TextRange {
     fn from(import: &ModuleImport) -> TextRange {
-        import.range.into()
+        import.range
     }
 }
 

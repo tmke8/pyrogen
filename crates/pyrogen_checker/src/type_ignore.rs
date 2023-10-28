@@ -2,6 +2,7 @@ use std::error::Error;
 use std::fmt::Display;
 use std::ops::Add;
 use std::path::Path;
+use std::str::FromStr;
 
 use anyhow::Result;
 use log::warn;
@@ -215,21 +216,20 @@ pub(crate) struct Codes<'a> {
 }
 
 impl Codes<'_> {
-    /// The codes that are ignored by the `noqa` directive.
+    /// The codes that are ignored by the `type: ignore` directive.
     pub(crate) fn codes(&self) -> &[&str] {
         &self.codes
     }
 }
 
 impl Ranged for Codes<'_> {
-    /// The range of the `noqa` directive.
+    /// The range of the `type: ignore` directive.
     fn range(&self) -> TextRange {
         self.range
     }
 }
 
-/// Returns `true` if the string list of `codes` includes `code` (or an alias
-/// thereof).
+/// Returns `true` if the string list of `codes` includes `code`.
 pub(crate) fn includes(needle: ErrorCode, haystack: &[&str]) -> bool {
     let needle = needle.to_str();
     haystack.iter().any(|&candidate| needle == candidate)
@@ -239,7 +239,7 @@ pub(crate) fn includes(needle: ErrorCode, haystack: &[&str]) -> bool {
 pub(crate) fn rule_is_ignored(
     code: ErrorCode,
     offset: TextSize,
-    noqa_line_for: &NoqaMapping,
+    noqa_line_for: &TypeIgnoreMapping,
     locator: &Locator,
 ) -> bool {
     let offset = noqa_line_for.resolve(offset);
@@ -456,14 +456,14 @@ impl<'a> TypeIgnores<'a> {
     }
 }
 
-/// Remaps offsets falling into one of the ranges to instead check for a noqa comment on the
-/// line specified by the offset.
+/// Remaps offsets falling into one of the ranges to instead check for a "type: ignore" comment on
+/// the line specified by the offset.
 #[derive(Debug, Default, PartialEq, Eq)]
-pub struct NoqaMapping {
+pub struct TypeIgnoreMapping {
     ranges: Vec<TextRange>,
 }
 
-impl NoqaMapping {
+impl TypeIgnoreMapping {
     pub(crate) fn with_capacity(capacity: usize) -> Self {
         Self {
             ranges: Vec::with_capacity(capacity),
@@ -510,9 +510,9 @@ impl NoqaMapping {
     }
 }
 
-impl FromIterator<TextRange> for NoqaMapping {
+impl FromIterator<TextRange> for TypeIgnoreMapping {
     fn from_iter<T: IntoIterator<Item = TextRange>>(iter: T) -> Self {
-        let mut mappings = NoqaMapping::default();
+        let mut mappings = TypeIgnoreMapping::default();
 
         for range in iter {
             mappings.push_mapping(range);

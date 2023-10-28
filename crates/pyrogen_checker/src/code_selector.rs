@@ -24,7 +24,7 @@ impl FromStr for ErrorCodeSelector {
             _ => {
                 // Does the selector select a single error code?
                 let error_code =
-                    ErrorCode::from_str(&s).map_err(|_| ParseError::Unknown(s.to_string()))?;
+                    ErrorCode::from_str(s).map_err(|_| ParseError::Unknown(s.to_string()))?;
                 Ok(Self::ErrorCode(error_code))
             }
         }
@@ -51,8 +51,7 @@ impl Serialize for ErrorCodeSelector {
     where
         S: serde::Serializer,
     {
-        let code = self.code();
-        serializer.serialize_str(&format!("{code}"))
+        serializer.serialize_str(self.code())
     }
 }
 
@@ -102,7 +101,7 @@ impl ErrorCodeSelector {
     }
 
     /// Returns rules matching the selector, taking into account preview options enabled.
-    pub fn rules<'a>(&'a self) -> impl Iterator<Item = ErrorCode> + 'a {
+    pub fn rules(&self) -> impl Iterator<Item = ErrorCode> + '_ {
         self.all_rules()
     }
 }

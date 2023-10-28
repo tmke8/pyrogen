@@ -42,7 +42,7 @@ impl CheckerSettings {
         Self {
             target_version: PythonVersion::default(),
             project_root: project_root.to_path_buf(),
-            table: ErrorCodeTable::from_iter(vec![ErrorCode::SyntaxError].into_iter()),
+            table: ErrorCodeTable::from_iter(vec![ErrorCode::SyntaxError]),
             namespace_packages: vec![],
             per_file_ignores: vec![],
 

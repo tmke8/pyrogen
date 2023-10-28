@@ -7,14 +7,14 @@ use rustpython_parser::Tok;
 use pyrogen_python_index::Indexer;
 use pyrogen_source_file::Locator;
 
-use crate::type_ignore::NoqaMapping;
+use crate::type_ignore::TypeIgnoreMapping;
 
 /// Extract a mapping from logical line to noqa line.
 pub fn extract_noqa_line_for(
     lxr: &[LexResult],
     locator: &Locator,
     indexer: &Indexer,
-) -> NoqaMapping {
+) -> TypeIgnoreMapping {
     let mut string_mappings = Vec::new();
 
     for (tok, range) in lxr.iter().flatten() {
@@ -66,7 +66,7 @@ pub fn extract_noqa_line_for(
 
     // Merge the mappings in sorted order
     let mut mappings =
-        NoqaMapping::with_capacity(continuation_mappings.len() + string_mappings.len());
+        TypeIgnoreMapping::with_capacity(continuation_mappings.len() + string_mappings.len());
 
     let mut continuation_mappings = continuation_mappings.into_iter().peekable();
     let mut string_mappings = string_mappings.into_iter().peekable();
@@ -95,16 +95,16 @@ pub fn extract_noqa_line_for(
 #[cfg(test)]
 mod tests {
     use rustpython_parser::lexer::LexResult;
-    use rustpython_parser::text_size::{TextLen, TextRange, TextSize};
+    use rustpython_parser::text_size::{TextRange, TextSize};
     use rustpython_parser::{lexer, Mode};
 
     use pyrogen_python_index::Indexer;
     use pyrogen_source_file::Locator;
 
     use crate::directives::extract_noqa_line_for;
-    use crate::type_ignore::NoqaMapping;
+    use crate::type_ignore::TypeIgnoreMapping;
 
-    fn noqa_mappings(contents: &str) -> NoqaMapping {
+    fn noqa_mappings(contents: &str) -> TypeIgnoreMapping {
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let locator = Locator::new(contents);
         let indexer = Indexer::from_tokens(&lxr, &locator);
@@ -119,26 +119,26 @@ y = 2 \
     + 1
 z = x + 1";
 
-        assert_eq!(noqa_mappings(contents), NoqaMapping::default());
+        assert_eq!(noqa_mappings(contents), TypeIgnoreMapping::default());
 
         let contents = "
 x = 1
 y = 2
 z = x + 1";
-        assert_eq!(noqa_mappings(contents), NoqaMapping::default());
+        assert_eq!(noqa_mappings(contents), TypeIgnoreMapping::default());
 
         let contents = "x = 1
 y = 2
 z = x + 1
         ";
-        assert_eq!(noqa_mappings(contents), NoqaMapping::default());
+        assert_eq!(noqa_mappings(contents), TypeIgnoreMapping::default());
 
         let contents = "x = 1
 
 y = 2
 z = x + 1
         ";
-        assert_eq!(noqa_mappings(contents), NoqaMapping::default());
+        assert_eq!(noqa_mappings(contents), TypeIgnoreMapping::default());
 
         let contents = "x = '''abc
 def
@@ -148,7 +148,7 @@ y = 2
 z = x + 1";
         assert_eq!(
             noqa_mappings(contents),
-            NoqaMapping::from_iter([TextRange::new(TextSize::from(0), TextSize::from(22))])
+            TypeIgnoreMapping::from_iter([TextRange::new(TextSize::from(0), TextSize::from(22))])
         );
 
         let contents = "x = 1
@@ -159,7 +159,7 @@ ghi
 z = 2";
         assert_eq!(
             noqa_mappings(contents),
-            NoqaMapping::from_iter([TextRange::new(TextSize::from(6), TextSize::from(28))])
+            TypeIgnoreMapping::from_iter([TextRange::new(TextSize::from(6), TextSize::from(28))])
         );
 
         let contents = "x = 1
@@ -169,14 +169,14 @@ ghi
 '''";
         assert_eq!(
             noqa_mappings(contents),
-            NoqaMapping::from_iter([TextRange::new(TextSize::from(6), TextSize::from(28))])
+            TypeIgnoreMapping::from_iter([TextRange::new(TextSize::from(6), TextSize::from(28))])
         );
 
         let contents = r"x = \
     1";
         assert_eq!(
             noqa_mappings(contents),
-            NoqaMapping::from_iter([TextRange::new(TextSize::from(0), TextSize::from(6))])
+            TypeIgnoreMapping::from_iter([TextRange::new(TextSize::from(0), TextSize::from(6))])
         );
 
         let contents = r"from foo import \
@@ -184,7 +184,7 @@ ghi
     qux as quux";
         assert_eq!(
             noqa_mappings(contents),
-            NoqaMapping::from_iter([TextRange::new(TextSize::from(0), TextSize::from(36))])
+            TypeIgnoreMapping::from_iter([TextRange::new(TextSize::from(0), TextSize::from(36))])
         );
 
         let contents = r"
@@ -198,7 +198,7 @@ y = \
     2";
         assert_eq!(
             noqa_mappings(contents),
-            NoqaMapping::from_iter([
+            TypeIgnoreMapping::from_iter([
                 TextRange::new(TextSize::from(7), TextSize::from(43)),
                 TextRange::new(TextSize::from(65), TextSize::from(71)),
                 TextRange::new(TextSize::from(77), TextSize::from(83)),
@@ -214,7 +214,7 @@ assert foo, \
         .trim();
         assert_eq!(
             noqa_mappings(contents),
-            NoqaMapping::from_iter([TextRange::new(TextSize::from(0), TextSize::from(48))])
+            TypeIgnoreMapping::from_iter([TextRange::new(TextSize::from(0), TextSize::from(48))])
         );
     }
 }

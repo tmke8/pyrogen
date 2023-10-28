@@ -68,19 +68,19 @@ impl ErrorCodeSet {
     /// ## Examples
     ///
     /// ```rust
-    /// # use ruff_linter::registry::{Rule, ErrorCodeSet};
-    /// let set_1 = ErrorCodeSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::AnyType]);
-    /// let set_2 = ErrorCodeSet::from_rules(&[
-    ///     Rule::BadQuotesInlineString,
-    ///     Rule::BooleanPositionalValueInCall,
+    /// # use pyrogen_checker::registry::{ErrorCode, ErrorCodeSet};
+    /// let set_1 = ErrorCodeSet::from_error_codes(&[ErrorCode::SyntaxError, ErrorCode::UnusedTypeIgnore]);
+    /// let set_2 = ErrorCodeSet::from_error_codes(&[
+    ///     ErrorCode::GeneralTypeError,
+    ///     ErrorCode::UnusedImport,
     /// ]);
     ///
     /// let union = set_1.union(&set_2);
     ///
-    /// assert!(union.contains(Rule::AmbiguousFunctionName));
-    /// assert!(union.contains(Rule::AnyType));
-    /// assert!(union.contains(Rule::BadQuotesInlineString));
-    /// assert!(union.contains(Rule::BooleanPositionalValueInCall));
+    /// assert!(union.contains(ErrorCode::SyntaxError));
+    /// assert!(union.contains(ErrorCode::UnusedTypeIgnore));
+    /// assert!(union.contains(ErrorCode::GeneralTypeError));
+    /// assert!(union.contains(ErrorCode::UnusedImport));
     /// ```
     #[must_use]
     pub const fn union(mut self, other: &Self) -> Self {
@@ -98,14 +98,14 @@ impl ErrorCodeSet {
     ///
     /// ## Examples
     /// ```rust
-    /// # use ruff_linter::registry::{Rule, ErrorCodeSet};
-    /// let set_1 = ErrorCodeSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::AnyType]);
-    /// let set_2 = ErrorCodeSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::Debugger]);
+    /// # use pyrogen_checker::registry::{ErrorCode, ErrorCodeSet};
+    /// let set_1 = ErrorCodeSet::from_error_codes(&[ErrorCode::SyntaxError, ErrorCode::UnusedTypeIgnore]);
+    /// let set_2 = ErrorCodeSet::from_error_codes(&[ErrorCode::SyntaxError, ErrorCode::Unreachable]);
     ///
     /// let subtract = set_1.subtract(&set_2);
     ///
-    /// assert!(subtract.contains(Rule::AnyType));
-    /// assert!(!subtract.contains(Rule::AmbiguousFunctionName));
+    /// assert!(subtract.contains(ErrorCode::UnusedTypeIgnore));
+    /// assert!(!subtract.contains(ErrorCode::SyntaxError));
     /// ```
     #[must_use]
     pub const fn subtract(mut self, other: &Self) -> Self {
@@ -123,17 +123,17 @@ impl ErrorCodeSet {
     ///
     /// ## Examples
     /// ```rust
-    /// # use ruff_linter::registry::{Rule, ErrorCodeSet};
-    /// let set_1 = ErrorCodeSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::AnyType]);
+    /// # use pyrogen_checker::registry::{ErrorCode, ErrorCodeSet};
+    /// let set_1 = ErrorCodeSet::from_error_codes(&[ErrorCode::SyntaxError, ErrorCode::UnusedTypeIgnore]);
     ///
-    /// assert!(set_1.intersects(&ErrorCodeSet::from_rules(&[
-    ///     Rule::AnyType,
-    ///     Rule::BadQuotesInlineString
+    /// assert!(set_1.intersects(&ErrorCodeSet::from_error_codes(&[
+    ///     ErrorCode::UnusedTypeIgnore,
+    ///     ErrorCode::GeneralTypeError
     /// ])));
     ///
-    /// assert!(!set_1.intersects(&ErrorCodeSet::from_rules(&[
-    ///     Rule::BooleanPositionalValueInCall,
-    ///     Rule::BadQuotesInlineString
+    /// assert!(!set_1.intersects(&ErrorCodeSet::from_error_codes(&[
+    ///     ErrorCode::UnusedImport,
+    ///     ErrorCode::GeneralTypeError
     /// ])));
     /// ```
     pub const fn intersects(&self, other: &Self) -> bool {
@@ -154,10 +154,10 @@ impl ErrorCodeSet {
     /// ## Examples
     ///
     /// ```rust
-    /// # use ruff_linter::registry::{Rule, ErrorCodeSet};
+    /// # use pyrogen_checker::registry::{ErrorCode, ErrorCodeSet};
     /// assert!(ErrorCodeSet::empty().is_empty());
     ///         assert!(
-    ///             !ErrorCodeSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::BadQuotesInlineString])
+    ///             !ErrorCodeSet::from_error_codes(&[ErrorCode::SyntaxError, ErrorCode::GeneralTypeError])
     ///                 .is_empty()
     ///         );
     /// ```
@@ -170,10 +170,10 @@ impl ErrorCodeSet {
     /// ## Examples
     ///
     /// ```rust
-    /// # use ruff_linter::registry::{Rule, ErrorCodeSet};
+    /// # use pyrogen_checker::registry::{ErrorCode, ErrorCodeSet};
     /// assert_eq!(ErrorCodeSet::empty().len(), 0);
     /// assert_eq!(
-    ///     ErrorCodeSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::BadQuotesInlineString]).len(),
+    ///     ErrorCodeSet::from_error_codes(&[ErrorCode::SyntaxError, ErrorCode::GeneralTypeError]).len(),
     ///     2
     /// );
     pub const fn len(&self) -> usize {
@@ -193,14 +193,14 @@ impl ErrorCodeSet {
     ///
     /// ## Examples
     /// ```rust
-    /// # use ruff_linter::registry::{Rule, ErrorCodeSet};
+    /// # use pyrogen_checker::registry::{ErrorCode, ErrorCodeSet};
     /// let mut set = ErrorCodeSet::empty();
     ///
-    /// assert!(!set.contains(Rule::AnyType));
+    /// assert!(!set.contains(ErrorCode::UnusedTypeIgnore));
     ///
-    /// set.insert(Rule::AnyType);
+    /// set.insert(ErrorCode::UnusedTypeIgnore);
     ///
-    /// assert!(set.contains(Rule::AnyType));
+    /// assert!(set.contains(ErrorCode::UnusedTypeIgnore));
     /// ```
     pub fn insert(&mut self, rule: ErrorCode) {
         let set = std::mem::take(self);
@@ -211,13 +211,13 @@ impl ErrorCodeSet {
     ///
     /// ## Examples
     /// ```rust
-    /// # use ruff_linter::registry::{Rule, ErrorCodeSet};
-    /// let mut set = ErrorCodeSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::AnyType]);
+    /// # use pyrogen_checker::registry::{ErrorCode, ErrorCodeSet};
+    /// let mut set = ErrorCodeSet::from_error_codes(&[ErrorCode::SyntaxError, ErrorCode::UnusedTypeIgnore]);
     ///
-    /// set.remove(Rule::AmbiguousFunctionName);
+    /// set.remove(ErrorCode::SyntaxError);
     ///
-    /// assert!(set.contains(Rule::AnyType));
-    /// assert!(!set.contains(Rule::AmbiguousFunctionName));
+    /// assert!(set.contains(ErrorCode::UnusedTypeIgnore));
+    /// assert!(!set.contains(ErrorCode::SyntaxError));
     /// ```
     pub fn remove(&mut self, rule: ErrorCode) {
         let set = std::mem::take(self);
@@ -228,11 +228,11 @@ impl ErrorCodeSet {
     ///
     /// ## Examples
     /// ```rust
-    /// # use ruff_linter::registry::{Rule, ErrorCodeSet};
-    /// let set = ErrorCodeSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::AnyType]);
+    /// # use pyrogen_checker::registry::{ErrorCode, ErrorCodeSet};
+    /// let set = ErrorCodeSet::from_error_codes(&[ErrorCode::SyntaxError, ErrorCode::UnusedTypeIgnore]);
     ///
-    /// assert!(set.contains(Rule::AmbiguousFunctionName));
-    /// assert!(!set.contains(Rule::BreakOutsideLoop));
+    /// assert!(set.contains(ErrorCode::SyntaxError));
+    /// assert!(!set.contains(ErrorCode::UndefinedName));
     /// ```
     pub const fn contains(&self, rule: ErrorCode) -> bool {
         let rule = rule as u16;
@@ -248,12 +248,12 @@ impl ErrorCodeSet {
     /// ## Examples
     ///
     /// ```rust
-    /// # use ruff_linter::registry::{Rule, ErrorCodeSet};
-    /// let set = ErrorCodeSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::AnyType]);
+    /// # use pyrogen_checker::registry::{ErrorCode, ErrorCodeSet};
+    /// let set = ErrorCodeSet::from_error_codes(&[ErrorCode::SyntaxError, ErrorCode::UnusedTypeIgnore]);
     ///
     /// let iter: Vec<_> = set.iter().collect();
     ///
-    /// assert_eq!(iter, vec![Rule::AnyType, Rule::AmbiguousFunctionName]);
+    /// assert_eq!(iter, vec![ErrorCode::UnusedTypeIgnore, ErrorCode::SyntaxError]);
     /// ```
     pub fn iter(&self) -> ErrorCodeSetIterator {
         ErrorCodeSetIterator {

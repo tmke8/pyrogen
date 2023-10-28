@@ -4,7 +4,6 @@ use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use serde_json::{json, Value};
 
-use pyrogen_source_file::SourceCode;
 use rustpython_ast::Ranged;
 
 use crate::message::{Emitter, Message};

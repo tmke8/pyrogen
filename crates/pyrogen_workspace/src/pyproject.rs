@@ -151,6 +151,9 @@ pub fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
+    use pyrogen_checker::registry::ErrorCode;
+    use pyrogen_checker::ErrorCodeSelector;
+    use rustc_hash::FxHashMap;
 
     use crate::options::Options;
     use crate::pyproject::{find_settings_toml, parse_pyproject_toml, Pyproject, Tools};
@@ -241,8 +244,15 @@ other-attribute = 1
         assert_eq!(
             config,
             Options {
-                exclude: Some(vec!["examples/excluded".to_string()]),
-                cache_dir: Some(".checker_cache".to_string()),
+                extend_exclude: Some(vec![
+                    "excluded_file.py".to_string(),
+                    "migrations".to_string(),
+                    "with_excluded_file/other_excluded_file.py".to_string(),
+                ]),
+                per_file_ignores: Some(FxHashMap::from_iter([(
+                    "__init__.py".to_string(),
+                    vec![ErrorCodeSelector::ErrorCode(ErrorCode::UnusedImport)]
+                )])),
                 ..Options::default()
             }
         );

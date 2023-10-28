@@ -20,7 +20,7 @@ use pyrogen_source_file::SourceFileBuilder;
 use pyrogen_workspace::Settings;
 use rustpython_parser::text_size::{TextRange, TextSize};
 
-use crate::diagnostics::Diagnostics;
+use crate::diagnostics::Messages;
 
 /// Maximum duration for which we keep a file in cache that hasn't been seen.
 const MAX_LAST_SEEN: Duration = Duration::from_secs(30 * 24 * 60 * 60); // 30 days.
@@ -209,8 +209,8 @@ impl Cache {
                 CacheMessage {
                     diagnostic: msg.diagnostic.clone(),
                     range: msg.range,
-                    ignore_offset: msg.ignore_offset.into(),
-                    kind: msg.kind.clone(),
+                    ignore_offset: msg.ignore_offset,
+                    kind: msg.kind,
                 }
             })
             .collect();
@@ -264,8 +264,8 @@ pub(crate) struct FileCache {
 }
 
 impl FileCache {
-    /// Convert the file cache into `Diagnostics`, using `path` as file name.
-    pub(crate) fn as_diagnostics(&self, path: &Path) -> Diagnostics {
+    /// Convert the file cache into `Messages`, using `path` as file name.
+    pub(crate) fn as_diagnostics(&self, path: &Path) -> Messages {
         let messages = if self.messages.is_empty() {
             Vec::new()
         } else {
@@ -274,14 +274,14 @@ impl FileCache {
                 .iter()
                 .map(|msg| Message {
                     diagnostic: msg.diagnostic.clone(),
-                    range: msg.range.into(),
+                    range: msg.range,
                     file: file.clone(),
-                    ignore_offset: msg.ignore_offset.into(),
-                    kind: msg.kind.clone(),
+                    ignore_offset: msg.ignore_offset,
+                    kind: msg.kind,
                 })
                 .collect()
         };
-        Diagnostics::new(messages, self.imports.clone())
+        Messages::new(messages, self.imports.clone())
     }
 }
 
@@ -337,11 +337,12 @@ mod tests {
 
     use itertools::Itertools;
     use pyrogen_cache::CACHE_DIR_NAME;
+    use pyrogen_checker::registry::ErrorCode;
     use pyrogen_checker::settings::flags;
 
     use crate::cache::RelativePathBuf;
     use crate::cache::{self, Cache, FileCache};
-    use crate::diagnostics::{lint_path, Diagnostics};
+    use crate::diagnostics::{type_check_path, Messages};
 
     use std::sync::atomic::AtomicU64;
 
@@ -349,11 +350,11 @@ mod tests {
     use pyrogen_python_ast::imports::ImportMap;
 
     use pyrogen_workspace::Settings;
-    use test_case::test_case;
 
-    #[test_case("../ruff_linter/resources/test/fixtures", "ruff_tests/cache_same_results_ruff_linter"; "ruff_linter_fixtures")]
-    #[test_case("../ruff_notebook/resources/test/fixtures", "ruff_tests/cache_same_results_ruff_notebook"; "ruff_notebook_fixtures")]
-    fn same_results(package_root: &str, cache_dir_path: &str) {
+    #[test]
+    fn same_results() {
+        let package_root: &str = "../pyrogen_checker/resources/test/fixtures";
+        let cache_dir_path: &str = "pyrogen_tests/cache_same_results_pyrogen_checker";
         let mut cache_dir = temp_dir();
         cache_dir.push(cache_dir_path);
         let _ = fs::remove_dir_all(&cache_dir);
@@ -364,13 +365,14 @@ mod tests {
             ..Settings::default()
         };
 
-        let package_root = fs::canonicalize(package_root).unwrap();
+        let package_root = fs::canonicalize(package_root);
+        let package_root = package_root.unwrap();
         let cache = Cache::open(package_root.clone(), &settings);
         assert_eq!(cache.new_files.lock().unwrap().len(), 0);
 
         let mut paths = Vec::new();
         let mut parse_errors = Vec::new();
-        let mut expected_diagnostics = Diagnostics::default();
+        let mut expected_diagnostics = Messages::default();
         for entry in fs::read_dir(&package_root).unwrap() {
             let entry = entry.unwrap();
             if !entry.file_type().unwrap().is_dir() {
@@ -389,22 +391,22 @@ mod tests {
                 }
 
                 let path = entry.path();
-                if path.ends_with("pyproject.toml") || path.ends_with("R.ipynb") {
+                if path.ends_with("pyproject.toml") {
                     continue;
                 }
 
-                let diagnostics = lint_path(
+                let diagnostics = type_check_path(
                     &path,
                     Some(&package_root),
                     &settings.checker,
                     Some(&cache),
-                    flags::Noqa::Enabled,
+                    flags::TypeIgnore::Enabled,
                 )
                 .unwrap();
                 if diagnostics
                     .messages
                     .iter()
-                    .any(|m| m.diagnostic.error_code == Rule::SyntaxError)
+                    .any(|m| m.diagnostic.error_code == ErrorCode::SyntaxError)
                 {
                     parse_errors.push(path.clone());
                 }
@@ -435,14 +437,14 @@ mod tests {
             );
         }
 
-        let mut got_diagnostics = Diagnostics::default();
+        let mut got_diagnostics = Messages::default();
         for path in paths {
-            got_diagnostics += lint_path(
+            got_diagnostics += type_check_path(
                 &path,
                 Some(&package_root),
                 &settings.checker,
                 Some(&cache),
-                flags::Noqa::Enabled,
+                flags::TypeIgnore::Enabled,
             )
             .unwrap();
         }
@@ -647,7 +649,7 @@ mod tests {
         fn new(name: &str) -> Self {
             // Build a new cache directory and clear it
             let mut test_dir = temp_dir();
-            test_dir.push("ruff_tests/cache");
+            test_dir.push("pyrogen_tests/cache");
             test_dir.push(name);
 
             let _ = fs::remove_dir_all(&test_dir);
@@ -691,13 +693,13 @@ mod tests {
             &self,
             path: &str,
             cache: &Cache,
-        ) -> Result<Diagnostics, anyhow::Error> {
-            lint_path(
+        ) -> Result<Messages, anyhow::Error> {
+            type_check_path(
                 &self.package_root.join(path),
                 Some(&self.package_root),
                 &self.settings.checker,
                 Some(cache),
-                flags::Noqa::Enabled,
+                flags::TypeIgnore::Enabled,
             )
         }
     }

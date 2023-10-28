@@ -9,7 +9,7 @@ use itertools::Itertools;
 use pyrogen_checker::{
     fs,
     logging::{set_up_logging, LogLevel},
-    settings::types::SerializationFormat,
+    settings::code_table::MessageKind,
     warn_user_once,
 };
 use pyrogen_workspace::resolver::python_files_in_path;
@@ -24,6 +24,7 @@ mod diagnostics;
 mod panic;
 mod printer;
 pub mod resolve;
+mod stdin;
 
 #[derive(Copy, Clone)]
 pub enum ExitStatus {
@@ -43,36 +44,6 @@ impl From<ExitStatus> for ExitCode {
             ExitStatus::Error => ExitCode::from(2),
         }
     }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-enum ChangeKind {
-    Configuration,
-    SourceFile,
-}
-
-/// Return the [`ChangeKind`] based on the list of modified file paths.
-///
-/// Returns `None` if no relevant changes were detected.
-fn change_detected(paths: &[PathBuf]) -> Option<ChangeKind> {
-    // If any `.toml` files were modified, return `ChangeKind::Configuration`. Otherwise, return
-    // `ChangeKind::SourceFile` if any `.py`, `.pyi`, `.pyw`, or `.ipynb` files were modified.
-    let mut source_file = false;
-    for path in paths {
-        if let Some(suffix) = path.extension() {
-            match suffix.to_str() {
-                Some("toml") => {
-                    return Some(ChangeKind::Configuration);
-                }
-                Some("py" | "pyi" | "pyw" | "ipynb") => source_file = true,
-                _ => {}
-            }
-        }
-    }
-    if source_file {
-        return Some(ChangeKind::SourceFile);
-    }
-    None
 }
 
 /// Returns true if the command should read from standard input.
@@ -118,7 +89,7 @@ pub fn run(
 "#,
                     "error".red().bold(),
                     ":".bold(),
-                    "Ruff crashed.".bold(),
+                    "Pyrogen crashed.".bold(),
                 );
             }
             default_panic_hook(info);
@@ -166,38 +137,44 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         writeln!(writer, "{}", entry.path().to_string_lossy())?;
     }
 
-    let output_format = SerializationFormat::Text;
     let printer_flags = PrinterFlags::SHOW_VIOLATIONS;
-    let printer = Printer::new(output_format, log_level, printer_flags);
+    let printer = Printer::new(
+        pyproject_config.settings.output_format,
+        log_level,
+        printer_flags,
+    );
 
     let is_stdin = is_stdin(&cli.files, cli.stdin_filename.as_deref());
     let cache = !cli.no_cache;
-    let noqa = true;
+    // TODO: make this configurable.
+    let respect_type_ignore = true;
 
     // Generate lint violations.
     let diagnostics = if is_stdin {
-        todo!("implement stdin")
-        // commands::check_stdin::check_stdin(
-        //     cli.stdin_filename.map(fs::normalize_path).as_deref(),
-        //     &pyproject_config,
-        //     &overrides,
-        //     noqa.into(),
-        // )?
+        commands::check_stdin::check_stdin(
+            cli.stdin_filename.map(fs::normalize_path).as_deref(),
+            &pyproject_config,
+            &overrides,
+            respect_type_ignore.into(),
+        )?
     } else {
         commands::check::check(
             &cli.files,
             &pyproject_config,
             &overrides,
             cache.into(),
-            noqa.into(),
+            respect_type_ignore.into(),
         )?
     };
     printer.write_once(&diagnostics, &mut writer)?;
 
-    if !cli.exit_zero {
-        if !diagnostics.messages.is_empty() {
-            return Ok(ExitStatus::Failure);
-        }
+    if !cli.exit_zero
+        && diagnostics
+            .messages
+            .into_iter()
+            .any(|message| message.kind == MessageKind::Error)
+    {
+        return Ok(ExitStatus::Failure);
     }
 
     Ok(ExitStatus::Success)

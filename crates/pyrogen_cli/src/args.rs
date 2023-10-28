@@ -94,6 +94,14 @@ pub struct CheckCommand {
         help_heading = "File selection"
     )]
     pub exclude: Option<Vec<FilePattern>>,
+    /// Like --exclude, but adds additional files and directories on top of those already excluded.
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "FILE_PATTERN",
+        help_heading = "File selection"
+    )]
+    pub extend_exclude: Option<Vec<FilePattern>>,
 
     /// Output serialization format for violations.
     #[arg(long, value_enum, env = "PYROGEN_OUTPUT_FORMAT")]
@@ -197,6 +205,7 @@ impl CheckCommand {
             },
             CliOverrides {
                 exclude: self.exclude,
+                extend_exclude: self.extend_exclude,
                 respect_gitignore: resolve_bool_arg(
                     self.respect_gitignore,
                     self.no_respect_gitignore,
@@ -210,6 +219,7 @@ impl CheckCommand {
                 // TODO(charlie): Included in `pyproject.toml`, but not inherited.
                 cache_dir: self.cache_dir,
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
+                output_format: self.output_format,
             },
         )
     }
@@ -241,6 +251,7 @@ pub struct CheckArguments {
 #[allow(clippy::struct_excessive_bools)]
 pub struct CliOverrides {
     pub exclude: Option<Vec<FilePattern>>,
+    pub extend_exclude: Option<Vec<FilePattern>>,
     pub respect_gitignore: Option<bool>,
     pub error: Option<Vec<ErrorCodeSelector>>,
     pub extend_error: Option<Vec<ErrorCodeSelector>>,
@@ -251,6 +262,7 @@ pub struct CliOverrides {
     // TODO(charlie): Captured in pyproject.toml as a default, but not part of `Settings`.
     pub cache_dir: Option<PathBuf>,
     pub force_exclude: Option<bool>,
+    pub output_format: Option<SerializationFormat>,
 }
 
 impl ConfigurationTransformer for CliOverrides {
@@ -261,13 +273,19 @@ impl ConfigurationTransformer for CliOverrides {
         if let Some(exclude) = &self.exclude {
             config.exclude = Some(exclude.clone());
         }
+        if let Some(extend_exclude) = &self.extend_exclude {
+            config.extend_exclude.extend(extend_exclude.clone());
+        }
         config.rule_selections.push(ErrorCodeSelection {
             error: self.error.clone(),
             warning: self.warning.clone(),
-            ignore: self.ignore.iter().cloned().flatten().collect(),
+            ignore: self.ignore.iter().flatten().cloned().collect(),
             extend_error: self.extend_error.clone().unwrap_or_default(),
             extend_warning: self.extend_warning.clone().unwrap_or_default(),
         });
+        if let Some(output_format) = &self.output_format {
+            config.output_format = Some(*output_format);
+        }
         if let Some(force_exclude) = &self.force_exclude {
             config.force_exclude = Some(*force_exclude);
         }

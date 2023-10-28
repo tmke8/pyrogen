@@ -2,7 +2,10 @@ use pyrogen_macros::OptionsMetadata;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
-use pyrogen_checker::{settings::types::PythonVersion, ErrorCodeSelector};
+use pyrogen_checker::{
+    settings::types::{PythonVersion, SerializationFormat},
+    ErrorCodeSelector,
+};
 
 #[derive(Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -140,6 +143,21 @@ pub struct Options {
     )]
     pub exclude: Option<Vec<String>>,
 
+    /// The style in which violation messages should be formatted: `"text"`
+    /// (default), `"grouped"` (group messages by file), `"json"`
+    /// (machine-readable), `"junit"` (machine-readable XML), `"github"` (GitHub
+    /// Actions annotations), `"gitlab"` (GitLab CI code quality report),
+    /// `"pylint"` (Pylint text format) or `"azure"` (Azure Pipeline logging commands).
+    #[option(
+        default = r#""text""#,
+        value_type = r#""text" | "json" | "junit" | "github" | "gitlab" | "pylint" | "azure""#,
+        example = r#"
+            # Group violations by containing file.
+            output-format = "grouped"
+        "#
+    )]
+    pub output_format: Option<SerializationFormat>,
+
     /// Whether to enforce `exclude` and `extend-exclude` patterns, even for
     /// paths that are passed to Pyrogen explicitly. Typically, Pyrogen will lint
     /// any paths passed in directly, even if they would typically be
@@ -158,6 +176,30 @@ pub struct Options {
         "#
     )]
     pub force_exclude: Option<bool>,
+
+    /// A list of file patterns to omit from linting, in addition to those
+    /// specified by `exclude`.
+    ///
+    /// Exclusions are based on globs, and can be either:
+    ///
+    /// - Single-path patterns, like `.mypy_cache` (to exclude any directory
+    ///   named `.mypy_cache` in the tree), `foo.py` (to exclude any file named
+    ///   `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ).
+    /// - Relative patterns, like `directory/foo.py` (to exclude that specific
+    ///   file) or `directory/*.py` (to exclude any Python files in
+    ///   `directory`). Note that these paths are relative to the project root
+    ///   (e.g., the directory containing your `pyproject.toml`).
+    ///
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = r#"
+            # In addition to the standard set of exclusions, omit all tests, plus a specific file.
+            extend-exclude = ["tests", "src/bad.py"]
+        "#
+    )]
+    pub extend_exclude: Option<Vec<String>>,
 
     /// A list of file patterns to include when linting.
     ///

@@ -52,5 +52,7 @@ wild = { version = "2.2.0" }
 
 [dev-dependencies]
 insta = { workspace = true, features = ["filters"] }
+# Avoid writing colored snapshots when running tests from the terminal
+colored = { workspace = true, features = ["no-color"] }
 tempfile = "3.8.0"
 test-case = { workspace = true }

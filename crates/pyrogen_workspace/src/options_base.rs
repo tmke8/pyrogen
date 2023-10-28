@@ -237,10 +237,8 @@ impl OptionSet {
             }
 
             fn record_field(&mut self, name: &str, field: OptionField) {
-                if self.option.is_none() && name == self.needle {
-                    if self.parts.next().is_none() {
-                        self.option = Some(OptionEntry::Field(field));
-                    }
+                if self.option.is_none() && name == self.needle && self.parts.next().is_none() {
+                    self.option = Some(OptionEntry::Field(field));
                 }
             }
         }

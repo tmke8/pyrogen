@@ -13,3 +13,6 @@ regex = { workspace = true }
 globset = { workspace = true }
 seahash = "4.1.0"
 filetime = { workspace = true }
+
+[dev-dependencies]
+pyrogen_macros = { path = "../pyrogen_macros" }

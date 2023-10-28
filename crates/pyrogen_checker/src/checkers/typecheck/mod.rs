@@ -8,7 +8,7 @@ use rustpython_ast::{text_size::TextRange, Constant, Expr, Stmt, StmtAnnAssign, 
 use crate::{
     registry::{Diagnostic, DiagnosticKind, ErrorCode},
     settings::{flags, CheckerSettings},
-    type_ignore::NoqaMapping,
+    type_ignore::TypeIgnoreMapping,
 };
 
 fn type_mismatch(var_type: String, value_type: String) -> DiagnosticKind {
@@ -26,9 +26,9 @@ pub(crate) fn check_ast(
     python_ast: &Suite<TextRange>,
     locator: &Locator,
     indexer: &Indexer,
-    noqa_line_for: &NoqaMapping,
+    noqa_line_for: &TypeIgnoreMapping,
     settings: &CheckerSettings,
-    noqa: flags::Noqa,
+    noqa: flags::TypeIgnore,
     path: &Path,
     package: Option<&Path>,
     source_type: PySourceType,
@@ -63,7 +63,7 @@ pub(crate) fn check_ast(
                                     if let Some(value_type) = value_type {
                                         diagnostics.push(Diagnostic::new(
                                             type_mismatch("int".into(), value_type.into()),
-                                            range.clone(),
+                                            *range,
                                         ))
                                     }
                                 }

@@ -1,8 +1,6 @@
-use rustpython_parser::ast::Ranged;
 use rustpython_parser::text_size::{TextRange, TextSize};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::fmt;
 use std::{
     cmp::Ordering,
     fmt::{Debug, Formatter},

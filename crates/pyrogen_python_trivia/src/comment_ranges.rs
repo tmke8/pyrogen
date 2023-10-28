@@ -3,7 +3,6 @@ use std::ops::Deref;
 
 use itertools::Itertools;
 
-use rustpython_parser::ast::Ranged;
 use rustpython_parser::text_size::TextRange;
 
 /// Stores the ranges of comments sorted by [`TextRange::start`] in increasing order. No two ranges are overlapping.

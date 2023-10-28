@@ -1,3 +1,7 @@
 [tool.pyrogen]
-exclude = ["examples/excluded"]
-cache-dir = ".checker_cache"
+extend-exclude = [
+    "excluded_file.py",
+    "migrations",
+    "with_excluded_file/other_excluded_file.py",
+]
+per-file-ignores = { "__init__.py" = ["unused-import"] }

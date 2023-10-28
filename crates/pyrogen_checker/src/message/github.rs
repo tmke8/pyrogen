@@ -26,7 +26,7 @@ impl Emitter for GithubEmitter {
                 "::{kind} title=Pyrogen \
                          ({code}),file={file},line={row},col={column},endLine={end_row},endColumn={end_column}::",
                 kind = kind,
-                code = message.diagnostic.error_code.to_string(),
+                code = message.diagnostic.error_code,
                 file = message.filename(),
                 row = source_location.row,
                 column = source_location.column,
@@ -40,7 +40,7 @@ impl Emitter for GithubEmitter {
                 path = relativize_path(message.filename()),
                 row = location.row,
                 column = location.column,
-                code = message.diagnostic.error_code.to_string(),
+                code = message.diagnostic.error_code,
                 body = message.diagnostic.body,
             )?;
         }
