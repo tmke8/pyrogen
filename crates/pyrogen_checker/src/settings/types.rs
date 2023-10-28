@@ -202,6 +202,8 @@ impl PerFileIgnore {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum SerializationFormat {
     Text,
+    Json,
+    Github,
 }
 
 impl Default for SerializationFormat {

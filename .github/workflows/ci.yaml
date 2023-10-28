@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  CARGO_TERM_COLOR: always
+  RUSTUP_MAX_RETRIES: 10
+  PACKAGE_NAME: pyrogen_check
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  cargo-fmt:
+    name: "cargo fmt"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Install Rust toolchain"
+        run: rustup component add rustfmt
+      - run: cargo fmt --all --check
+
+  cargo-clippy:
+    name: "cargo clippy"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Install Rust toolchain"
+        run: |
+          rustup component add clippy
+          rustup target add wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: "Clippy"
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings -A dead_code -A unused_variables -A clippy::single_match
+    #   - name: "Clippy (wasm)"
+    #     run: cargo clippy -p pyrogen_wasm --target wasm32-unknown-unknown --all-features -- -D warnings
+
+  cargo-test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    name: "cargo test | ${{ matrix.os }}"
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - name: "Install cargo insta"
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-insta
+      - uses: Swatinem/rust-cache@v2
+      - name: "Run tests (Ubuntu)"
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: cargo insta test --all --all-features --unreferenced reject
+      - name: "Run tests (Windows)"
+        if: ${{ matrix.os == 'windows-latest' }}
+        shell: bash
+        # We can't reject unreferenced snapshots on windows because flake8_executable can't run on windows
+        run: cargo insta test --all --all-features
+
+  cargo-test-wasm:
+    runs-on: ubuntu-latest
+    name: "cargo test (wasm)"
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Install Rust toolchain"
+        run: rustup target add wasm32-unknown-unknown
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: "npm"
+          cache-dependency-path: playground/package-lock.json
+      - uses: jetli/wasm-pack-action@v0.4.0
+      - uses: Swatinem/rust-cache@v2
+      - name: "Run wasm-pack"
+        run: |
+          cd crates/pyrogen_wasm
+          wasm-pack test --node
+
+  python-package:
+    name: "python package"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          architecture: x64
+      - uses: Swatinem/rust-cache@v2
+      - name: "Build wheels"
+        uses: PyO3/maturin-action@v1
+        with:
+          args: --out dist
+      - name: "Test wheel"
+        run: |
+          pip install --force-reinstall --find-links dist ${{ env.PACKAGE_NAME }}
+          pyrogen --help
+          python -m pyrogen_check --help
+      - name: "Remove wheels from cache"
+        run: rm -rf target/wheels

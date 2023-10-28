@@ -1,24 +1,19 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
-use std::fs::{write, File};
 use std::io;
-use std::io::{BufWriter, Write};
 use std::ops::AddAssign;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use colored::Colorize;
 use filetime::FileTime;
 use log::{debug, error, warn};
-use rustc_hash::FxHashMap;
-use rustpython_parser::ast::Ranged;
 use rustpython_parser::text_size::{TextRange, TextSize};
-use similar::TextDiff;
 use thiserror::Error;
 
-use pyrogen_checker::checker::{lint_only, CheckerResult, FixTable, FixerResult};
+use pyrogen_checker::checker::{lint_only, CheckerResult};
 use pyrogen_checker::fs;
 use pyrogen_checker::logging::DisplayParseError;
 use pyrogen_checker::message::Message;
@@ -28,7 +23,7 @@ use pyrogen_checker::settings::{flags, CheckerSettings};
 use pyrogen_checker::source_kind::SourceKind;
 use pyrogen_macros::CacheKey;
 use pyrogen_python_ast::imports::ImportMap;
-use pyrogen_python_ast::{PySourceType, SourceType, TomlSourceType};
+use pyrogen_python_ast::{SourceType, TomlSourceType};
 use pyrogen_source_file::{LineIndex, SourceCode, SourceFileBuilder};
 use pyrogen_workspace::Settings;
 
@@ -60,24 +55,24 @@ impl FileCacheKey {
 }
 
 #[derive(Debug, Default, PartialEq)]
-pub(crate) struct Diagnostics {
+pub(crate) struct Messages {
     pub(crate) messages: Vec<Message>,
     pub(crate) imports: ImportMap,
 }
 
-impl Diagnostics {
+impl Messages {
     pub(crate) fn new(messages: Vec<Message>, imports: ImportMap) -> Self {
         Self { messages, imports }
     }
 
-    /// Generate [`Diagnostics`] based on a [`SourceExtractionError`].
+    /// Generate [`Messages`] based on a [`SourceExtractionError`].
     pub(crate) fn from_source_error(
         err: &SourceExtractionError,
         path: Option<&Path>,
         settings: &CheckerSettings,
     ) -> Self {
         let diagnostic = Diagnostic::from(err);
-        if settings.rules.enabled(diagnostic.kind.error_code()) {
+        if let Some(kind) = settings.table.entry(diagnostic.kind.error_code()) {
             let name = path.map_or_else(|| "-".into(), std::path::Path::to_string_lossy);
             let dummy = SourceFileBuilder::new(name, "").finish();
             Self::new(
@@ -85,6 +80,7 @@ impl Diagnostics {
                     diagnostic,
                     dummy,
                     TextSize::default(),
+                    kind,
                 )],
                 ImportMap::default(),
             )
@@ -93,13 +89,13 @@ impl Diagnostics {
                 Some(path) => {
                     warn!(
                         "{}{}{} {err}",
-                        "Failed to lint ".bold(),
+                        "Failed to check ".bold(),
                         fs::relativize_path(path).bold(),
                         ":".bold()
                     );
                 }
                 None => {
-                    warn!("{}{} {err}", "Failed to lint".bold(), ":".bold());
+                    warn!("{}{} {err}", "Failed to check".bold(), ":".bold());
                 }
             }
 
@@ -108,29 +104,47 @@ impl Diagnostics {
     }
 }
 
-impl AddAssign for Diagnostics {
+impl AddAssign for Messages {
     fn add_assign(&mut self, other: Self) {
         self.messages.extend(other.messages);
         self.imports.extend(other.imports);
     }
 }
 
-/// Lint the source code at the given `Path`.
-pub(crate) fn lint_path(
+/// Type-check the source code at the given `Path`.
+pub(crate) fn type_check_path(
     path: &Path,
     package: Option<&Path>,
     settings: &CheckerSettings,
     cache: Option<&Cache>,
-    noqa: flags::Noqa,
-) -> Result<Diagnostics> {
+    respect_type_ignore: flags::TypeIgnore,
+) -> Result<Messages> {
     // Check the cache.
+    let caching = match cache {
+        Some(cache) if respect_type_ignore.into() => {
+            let relative_path = cache
+                .relative_path(path)
+                .expect("wrong package cache for file");
+
+            let cache_key = FileCacheKey::from_path(path).context("Failed to create cache key")?;
+
+            if let Some(cache) = cache.get(relative_path, &cache_key) {
+                return Ok(cache.as_diagnostics(path));
+            }
+
+            // Stash the file metadata for later so when we update the cache it reflects the prerun
+            // information
+            Some((cache, relative_path, cache_key))
+        }
+        _ => None,
+    };
 
     debug!("Checking: {}", path.display());
 
     let source_type = match SourceType::from(path) {
         SourceType::Toml(TomlSourceType::Pyproject) => {
             let messages = if settings
-                .rules
+                .table
                 .iter_enabled()
                 .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
             {
@@ -138,7 +152,7 @@ pub(crate) fn lint_path(
                     match std::fs::read_to_string(path).map_err(SourceExtractionError::Io) {
                         Ok(contents) => contents,
                         Err(err) => {
-                            return Ok(Diagnostics::from_source_error(&err, Some(path), settings));
+                            return Ok(Messages::from_source_error(&err, Some(path), settings));
                         }
                     };
                 let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
@@ -146,21 +160,21 @@ pub(crate) fn lint_path(
             } else {
                 vec![]
             };
-            return Ok(Diagnostics {
+            return Ok(Messages {
                 messages,
-                ..Diagnostics::default()
+                ..Messages::default()
             });
         }
-        SourceType::Toml(_) => return Ok(Diagnostics::default()),
+        SourceType::Toml(_) => return Ok(Messages::default()),
         SourceType::Python(source_type) => source_type,
     };
 
     // Extract the sources from the file.
-    let LintSource(source_kind) = match LintSource::try_from_path(path, source_type) {
+    let LintSource(source_kind) = match LintSource::try_from_path(path) {
         Ok(Some(sources)) => sources,
-        Ok(None) => return Ok(Diagnostics::default()),
+        Ok(None) => return Ok(Messages::default()),
         Err(err) => {
-            return Ok(Diagnostics::from_source_error(&err, Some(path), settings));
+            return Ok(Messages::from_source_error(&err, Some(path), settings));
         }
     };
     let source_kind = SourceKind::new(source_kind);
@@ -169,9 +183,23 @@ pub(crate) fn lint_path(
     let CheckerResult {
         data: (messages, imports),
         error: parse_error,
-    } = lint_only(path, package, settings, noqa, &source_kind, source_type);
+    } = lint_only(
+        path,
+        package,
+        settings,
+        respect_type_ignore,
+        &source_kind,
+        source_type,
+    );
 
     let imports = imports.unwrap_or_default();
+
+    if let Some((cache, relative_path, key)) = caching {
+        // We don't cache parsing errors.
+        if parse_error.is_none() {
+            cache.update(relative_path.to_owned(), key, &messages, &imports);
+        }
+    }
 
     if let Some(err) = parse_error {
         error!(
@@ -187,35 +215,23 @@ pub(crate) fn lint_path(
         );
     }
 
-    Ok(Diagnostics { messages, imports })
+    Ok(Messages { messages, imports })
 }
 
 /// Generate `Diagnostic`s from source code content derived from
 /// stdin.
-pub(crate) fn lint_stdin(
+pub(crate) fn type_check_stdin(
     path: Option<&Path>,
     package: Option<&Path>,
     contents: String,
     settings: &Settings,
-    noqa: flags::Noqa,
-) -> Result<Diagnostics> {
+    noqa: flags::TypeIgnore,
+) -> Result<Messages> {
     let SourceType::Python(source_type) = path.map(SourceType::from).unwrap_or_default() else {
-        return Ok(Diagnostics::default());
+        return Ok(Messages::default());
     };
 
-    // Extract the sources from the file.
-    let LintSource(source_kind) = match LintSource::try_from_source_code(contents, source_type) {
-        Ok(Some(sources)) => sources,
-        Ok(None) => return Ok(Diagnostics::default()),
-        Err(err) => {
-            return Ok(Diagnostics::from_source_error(
-                &err,
-                path,
-                &settings.checker,
-            ));
-        }
-    };
-    let source_kind = SourceKind::new(source_kind);
+    let source_kind = SourceKind::new(contents);
 
     // Lint the inputs.
     let CheckerResult {
@@ -239,7 +255,7 @@ pub(crate) fn lint_stdin(
         );
     }
 
-    Ok(Diagnostics { messages, imports })
+    Ok(Messages { messages, imports })
 }
 
 #[derive(Debug)]
@@ -247,23 +263,10 @@ pub(crate) struct LintSource(String);
 
 impl LintSource {
     /// Extract the lint [`LintSource`] from the given file path.
-    pub(crate) fn try_from_path(
-        path: &Path,
-        source_type: PySourceType,
-    ) -> Result<Option<LintSource>, SourceExtractionError> {
+    pub(crate) fn try_from_path(path: &Path) -> Result<Option<LintSource>, SourceExtractionError> {
         // This is tested by ruff_cli integration test `unreadable_file`
         let contents = std::fs::read_to_string(path)?;
         Ok(Some(LintSource(contents)))
-    }
-
-    /// Extract the lint [`LintSource`] from the raw string contents, optionally accompanied by a
-    /// file path indicating the path to the file from which the contents were read. If provided,
-    /// the file path should be used for diagnostics, but not for reading the file from disk.
-    pub(crate) fn try_from_source_code(
-        source_code: String,
-        source_type: PySourceType,
-    ) -> Result<Option<LintSource>, SourceExtractionError> {
-        Ok(Some(LintSource(source_code)))
     }
 }
 

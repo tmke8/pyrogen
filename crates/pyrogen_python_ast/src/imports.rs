@@ -3,8 +3,6 @@ use rustpython_parser::text_size::TextRange;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use pyrogen_source_file::TextRangeWrapper;
-
 /// A representation of an individual name imported via any import statement.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AnyImport<'a> {
@@ -125,21 +123,18 @@ impl FutureImport for AnyImport<'_> {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ModuleImport {
     module: String,
-    range: TextRangeWrapper,
+    range: TextRange,
 }
 
 impl ModuleImport {
     pub fn new(module: String, range: TextRange) -> Self {
-        Self {
-            module,
-            range: TextRangeWrapper::wrap(range),
-        }
+        Self { module, range }
     }
 }
 
 impl From<&ModuleImport> for TextRange {
     fn from(import: &ModuleImport) -> TextRange {
-        import.range.into()
+        import.range
     }
 }
 

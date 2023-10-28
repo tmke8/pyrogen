@@ -4,7 +4,6 @@ use std::ops::Add;
 
 use memchr::{memchr2, memrchr2};
 use once_cell::unsync::OnceCell;
-use rustpython_parser::ast::Ranged;
 use rustpython_parser::text_size::{TextLen, TextRange, TextSize};
 
 use crate::newlines::find_newline;
@@ -58,8 +57,8 @@ impl<'a> Locator<'a> {
     /// ## Examples
     ///
     /// ```
-    /// # use ruff_text_size::TextSize;
-    /// # use ruff_source_file::Locator;
+    /// # use rustpython_parser::text_size::TextSize;
+    /// # use pyrogen_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\rthird line");
     ///
@@ -104,8 +103,9 @@ impl<'a> Locator<'a> {
     /// ## Examples
     ///
     /// ```
-    /// # use ruff_text_size::{Ranged, TextRange, TextSize};
-    /// # use ruff_source_file::Locator;
+    /// # use rustpython_parser::ast::Ranged;
+    /// # use rustpython_parser::text_size::{TextRange, TextSize};
+    /// # use pyrogen_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -131,8 +131,9 @@ impl<'a> Locator<'a> {
     /// ## Examples
     ///
     /// ```
-    /// # use ruff_text_size::{Ranged, TextRange, TextSize};
-    /// # use ruff_source_file::Locator;
+    /// # use rustpython_parser::ast::Ranged;
+    /// # use rustpython_parser::text_size::{TextRange, TextSize};
+    /// # use pyrogen_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -161,8 +162,9 @@ impl<'a> Locator<'a> {
     /// ## Examples
     ///
     /// ```
-    /// # use ruff_text_size::{Ranged, TextRange, TextSize};
-    /// # use ruff_source_file::Locator;
+    /// # use rustpython_parser::ast::Ranged;
+    /// # use rustpython_parser::text_size::{TextRange, TextSize};
+    /// # use pyrogen_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -185,8 +187,9 @@ impl<'a> Locator<'a> {
     /// ## Examples
     ///
     /// ```
-    /// # use ruff_text_size::{Ranged, TextRange, TextSize};
-    /// # use ruff_source_file::Locator;
+    /// # use rustpython_parser::ast::Ranged;
+    /// # use rustpython_parser::text_size::{TextRange, TextSize};
+    /// # use pyrogen_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -208,8 +211,9 @@ impl<'a> Locator<'a> {
     /// ## Examples
     ///
     /// ```
-    /// # use ruff_text_size::{Ranged, TextRange, TextSize};
-    /// # use ruff_source_file::Locator;
+    /// # use rustpython_parser::ast::Ranged;
+    /// # use rustpython_parser::text_size::{TextRange, TextSize};
+    /// # use pyrogen_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -231,8 +235,9 @@ impl<'a> Locator<'a> {
     /// ## Examples
     ///
     /// ```
-    /// # use ruff_text_size::{Ranged, TextRange, TextSize};
-    /// # use ruff_source_file::Locator;
+    /// # use rustpython_parser::ast::Ranged;
+    /// # use rustpython_parser::text_size::{TextRange, TextSize};
+    /// # use pyrogen_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -255,8 +260,9 @@ impl<'a> Locator<'a> {
     /// ## Examples
     ///
     /// ```
-    /// # use ruff_text_size::{Ranged, TextRange, TextSize};
-    /// # use ruff_source_file::Locator;
+    /// # use rustpython_parser::ast::Ranged;
+    /// # use rustpython_parser::text_size::{TextRange, TextSize};
+    /// # use pyrogen_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -287,8 +293,9 @@ impl<'a> Locator<'a> {
     /// ## Examples
     ///
     /// ```
-    /// # use ruff_text_size::{Ranged, TextRange, TextSize};
-    /// # use ruff_source_file::Locator;
+    /// # use rustpython_parser::ast::Ranged;
+    /// # use rustpython_parser::text_size::{TextRange, TextSize};
+    /// # use pyrogen_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -311,8 +318,9 @@ impl<'a> Locator<'a> {
     /// Returns true if the text of `range` contains any line break.
     ///
     /// ```
-    /// # use ruff_text_size::{Ranged, TextRange, TextSize};
-    /// # use ruff_source_file::Locator;
+    /// # use rustpython_parser::ast::Ranged;
+    /// # use rustpython_parser::text_size::{TextRange, TextSize};
+    /// # use pyrogen_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -336,8 +344,9 @@ impl<'a> Locator<'a> {
     /// ## Examples
     ///
     /// ```
-    /// # use ruff_text_size::{Ranged, TextRange, TextSize};
-    /// # use ruff_source_file::Locator;
+    /// # use rustpython_parser::ast::Ranged;
+    /// # use rustpython_parser::text_size::{TextRange, TextSize};
+    /// # use pyrogen_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -364,8 +373,9 @@ impl<'a> Locator<'a> {
     /// ## Examples
     ///
     /// ```
-    /// # use ruff_text_size::{Ranged, TextRange, TextSize};
-    /// # use ruff_source_file::Locator;
+    /// # use rustpython_parser::ast::Ranged;
+    /// # use rustpython_parser::text_size::{TextRange, TextSize};
+    /// # use pyrogen_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -405,8 +415,9 @@ impl<'a> Locator<'a> {
     /// ## Examples
     ///
     /// ```
-    /// # use ruff_text_size::{Ranged, TextRange, TextSize};
-    /// # use ruff_source_file::Locator;
+    /// # use rustpython_parser::ast::Ranged;
+    /// # use rustpython_parser::text_size::{TextRange, TextSize};
+    /// # use pyrogen_source_file::Locator;
     ///
     /// let locator = Locator::new("Hello");
     ///
@@ -452,8 +463,8 @@ impl<'a> Locator<'a> {
 
     /// Take the source code between the given [`TextRange`].
     #[inline]
-    pub fn slice<T: Ranged>(&self, ranged: T) -> &'a str {
-        &self.contents[ranged.range()]
+    pub fn slice(&self, range: TextRange) -> &'a str {
+        &self.contents[range]
     }
 
     /// Return the underlying source code.

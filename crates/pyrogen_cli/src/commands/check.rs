@@ -9,24 +9,24 @@ use colored::Colorize;
 use ignore::Error;
 use itertools::Itertools;
 use log::{debug, error, warn};
+use pyrogen_checker::message::Message;
+use pyrogen_checker::registry::{Diagnostic, DiagnosticKind, ErrorCode};
+use pyrogen_checker::settings::code_table::MessageKind;
+use pyrogen_source_file::SourceFileBuilder;
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
-use rustc_hash::FxHashMap;
 use rustpython_parser::text_size::{TextRange, TextSize};
 
-use pyrogen_checker::message::Message;
-use pyrogen_checker::registry::ErrorCode;
 use pyrogen_checker::settings::{flags, CheckerSettings};
 use pyrogen_checker::{fs, warn_user_once};
 use pyrogen_python_ast::imports::ImportMap;
-use pyrogen_source_file::SourceFileBuilder;
 use pyrogen_workspace::resolver::{
     python_files_in_path, PyprojectConfig, PyprojectDiscoveryStrategy,
 };
 
 use crate::args::CliOverrides;
 use crate::cache::{self, Cache};
-use crate::diagnostics::Diagnostics;
+use crate::diagnostics::Messages;
 use crate::panic::catch_unwind;
 
 /// Run the checker over a collection of files.
@@ -35,8 +35,8 @@ pub(crate) fn check(
     pyproject_config: &PyprojectConfig,
     overrides: &CliOverrides,
     cache: flags::Cache,
-    noqa: flags::Noqa,
-) -> Result<Diagnostics> {
+    respect_type_ignore: flags::TypeIgnore,
+) -> Result<Messages> {
     // Collect all the Python files to check.
     let start = Instant::now();
     let (paths, resolver) = python_files_in_path(files, pyproject_config, overrides)?;
@@ -45,7 +45,7 @@ pub(crate) fn check(
 
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");
-        return Ok(Diagnostics::default());
+        return Ok(Messages::default());
     }
 
     // Initialize the cache.
@@ -96,7 +96,7 @@ pub(crate) fn check(
     });
 
     let start = Instant::now();
-    let mut diagnostics: Diagnostics = paths
+    let mut diagnostics: Messages = paths
         .par_iter()
         .map(|entry| {
             match entry {
@@ -119,15 +119,17 @@ pub(crate) fn check(
                         }
                     });
 
-                    lint_path(path, package, &settings.checker, cache, noqa).map_err(|e| {
-                        (Some(path.to_owned()), {
-                            let mut error = e.to_string();
-                            for cause in e.chain() {
-                                write!(&mut error, "\n  Cause: {cause}").unwrap();
-                            }
-                            error
-                        })
-                    })
+                    lint_path(path, package, &settings.checker, cache, respect_type_ignore).map_err(
+                        |e| {
+                            (Some(path.to_owned()), {
+                                let mut error = e.to_string();
+                                for cause in e.chain() {
+                                    write!(&mut error, "\n  Cause: {cause}").unwrap();
+                                }
+                                error
+                            })
+                        },
+                    )
                 }
                 Err(e) => Err((
                     if let Error::WithPath { path, .. } = e {
@@ -142,20 +144,41 @@ pub(crate) fn check(
             .unwrap_or_else(|(path, message)| {
                 if let Some(path) = &path {
                     let settings = resolver.resolve(path, pyproject_config);
-                    warn!(
-                        "{}{}{} {message}",
-                        "Failed to lint ".bold(),
-                        fs::relativize_path(path).bold(),
-                        ":".bold()
-                    );
-                    Diagnostics::default()
+                    if settings.checker.table.enabled(ErrorCode::IOError) {
+                        let dummy =
+                            SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();
+
+                        Messages::new(
+                            vec![Message::from_diagnostic(
+                                Diagnostic::new(
+                                    DiagnosticKind {
+                                        error_code: ErrorCode::IOError,
+                                        body: message,
+                                    },
+                                    TextRange::default(),
+                                ),
+                                dummy,
+                                TextSize::default(),
+                                MessageKind::Error,
+                            )],
+                            ImportMap::default(),
+                        )
+                    } else {
+                        warn!(
+                            "{}{}{} {message}",
+                            "Failed to lint ".bold(),
+                            fs::relativize_path(path).bold(),
+                            ":".bold()
+                        );
+                        Messages::default()
+                    }
                 } else {
                     warn!("{} {message}", "Encountered error:".bold());
-                    Diagnostics::default()
+                    Messages::default()
                 }
             })
         })
-        .reduce(Diagnostics::default, |mut acc, item| {
+        .reduce(Messages::default, |mut acc, item| {
             acc += item;
             acc
         });
@@ -182,10 +205,10 @@ fn lint_path(
     package: Option<&Path>,
     settings: &CheckerSettings,
     cache: Option<&Cache>,
-    noqa: flags::Noqa,
-) -> Result<Diagnostics> {
+    noqa: flags::TypeIgnore,
+) -> Result<Messages> {
     let result =
-        catch_unwind(|| crate::diagnostics::lint_path(path, package, settings, cache, noqa));
+        catch_unwind(|| crate::diagnostics::type_check_path(path, package, settings, cache, noqa));
 
     match result {
         Ok(inner) => inner,
@@ -204,7 +227,7 @@ fn lint_path(
                 ":".bold()
             );
 
-            Ok(Diagnostics::default())
+            Ok(Messages::default())
         }
     }
 }
@@ -216,7 +239,6 @@ mod test {
     use std::os::unix::fs::OpenOptionsExt;
 
     use anyhow::Result;
-    use rustc_hash::FxHashMap;
     use tempfile::TempDir;
 
     use pyrogen_checker::message::{Emitter, TextEmitter};
@@ -229,8 +251,7 @@ mod test {
 
     use super::check;
 
-    /// We check that regular python files, pyproject.toml and jupyter notebooks all handle io
-    /// errors gracefully
+    /// We check that regular python files and pyproject.toml all handle io errors gracefully.
     #[test]
     fn unreadable_files() -> Result<()> {
         let path = "E902.py";
@@ -260,18 +281,16 @@ mod test {
 
         // Run
         let diagnostics = check(
-            // Notebooks are not included by default
             &[tempdir.path().to_path_buf()],
             &pyproject_config,
             &CliOverrides::default(),
             flags::Cache::Disabled,
-            flags::Noqa::Disabled,
+            flags::TypeIgnore::Disabled,
         )
         .unwrap();
         let mut output = Vec::new();
 
         TextEmitter::default()
-            .with_show_fix_status(true)
             .emit(&mut output, &diagnostics.messages)
             .unwrap();
 

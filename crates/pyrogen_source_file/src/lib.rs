@@ -1,8 +1,6 @@
-use rustpython_parser::ast::Ranged;
 use rustpython_parser::text_size::{TextRange, TextSize};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::fmt;
 use std::{
     cmp::Ordering,
     fmt::{Debug, Formatter},
@@ -12,8 +10,8 @@ use std::{
 mod line_index;
 mod locator;
 pub mod newlines;
-#[cfg(feature = "serde")]
-pub mod serialize;
+// #[cfg(feature = "serde")]
+// pub mod serialize;
 
 pub use crate::line_index::{LineIndex, OneIndexed};
 pub use locator::Locator;
@@ -61,8 +59,8 @@ impl<'src, 'index> SourceCode<'src, 'index> {
     }
 
     /// Take the source code between the given [`TextRange`].
-    pub fn slice<T: Ranged>(&self, ranged: T) -> &'src str {
-        &self.text[ranged.range()]
+    pub fn slice(&self, range: TextRange) -> &'src str {
+        &self.text[range]
     }
 
     pub fn line_start(&self, line: OneIndexed) -> TextSize {
@@ -254,93 +252,29 @@ impl Debug for SourceLocation {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct TextRangeWrapper(TextRange);
+// #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+// pub struct TextRangeWrapper(TextRange);
 
-impl Ranged for TextRangeWrapper {
-    fn range(&self) -> TextRange {
-        self.0
-    }
-}
+// impl Ranged for TextRangeWrapper {
+//     fn range(&self) -> TextRange {
+//         self.0
+//     }
+// }
 
-impl TextRangeWrapper {
-    #[inline]
-    pub const fn new(start: TextSize, end: TextSize) -> Self {
-        TextRangeWrapper(TextRange::new(start, end))
-    }
+// impl TextRangeWrapper {
+//     #[inline]
+//     pub const fn new(start: TextSize, end: TextSize) -> Self {
+//         TextRangeWrapper(TextRange::new(start, end))
+//     }
 
-    #[inline]
-    pub const fn wrap(range: TextRange) -> Self {
-        TextRangeWrapper(range)
-    }
-}
+//     #[inline]
+//     pub const fn wrap(range: TextRange) -> Self {
+//         TextRangeWrapper(range)
+//     }
+// }
 
-impl Into<TextRange> for TextRangeWrapper {
-    fn into(self) -> TextRange {
-        self.0
-    }
-}
-
-#[derive(Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct CachableTextSize {
-    pub(crate) raw: u32,
-}
-
-impl fmt::Debug for CachableTextSize {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.raw)
-    }
-}
-
-impl CachableTextSize {
-    /// Creates a new `TextSize` at the given `offset`.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # use ruff_text_size::*;
-    /// assert_eq!(TextSize::from(4), TextSize::new(4));
-    /// ```
-    pub const fn new(offset: u32) -> Self {
-        Self { raw: offset }
-    }
-    /// Returns current raw `offset` as u32.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # use ruff_text_size::*;
-    /// assert_eq!(TextSize::from(4).to_u32(), 4);
-    /// ```
-    pub fn to_u32(&self) -> u32 {
-        self.raw
-    }
-}
-
-impl From<u32> for CachableTextSize {
-    #[inline]
-    fn from(raw: u32) -> Self {
-        CachableTextSize::new(raw)
-    }
-}
-
-impl From<CachableTextSize> for u32 {
-    #[inline]
-    fn from(value: CachableTextSize) -> Self {
-        value.to_u32()
-    }
-}
-
-impl From<TextSize> for CachableTextSize {
-    #[inline]
-    fn from(raw: TextSize) -> Self {
-        CachableTextSize::new(raw.to_u32())
-    }
-}
-
-impl From<CachableTextSize> for TextSize {
-    #[inline]
-    fn from(value: CachableTextSize) -> Self {
-        TextSize::new(value.to_u32())
-    }
-}
+// impl Into<TextRange> for TextRangeWrapper {
+//     fn into(self) -> TextRange {
+//         self.0
+//     }
+// }

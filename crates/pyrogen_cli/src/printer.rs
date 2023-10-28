@@ -7,19 +7,15 @@ use anyhow::Result;
 use bitflags::bitflags;
 use colored::Colorize;
 use itertools::{iterate, Itertools};
-use rustc_hash::FxHashMap;
 use serde::Serialize;
 
-use pyrogen_checker::checker::FixTable;
-use pyrogen_checker::fs::relativize_path;
 use pyrogen_checker::logging::LogLevel;
-use pyrogen_checker::message::{Emitter, TextEmitter};
+use pyrogen_checker::message::{Emitter, GithubEmitter, JsonEmitter, TextEmitter};
 use pyrogen_checker::notify_user;
 use pyrogen_checker::registry::{AsErrorCode, ErrorCode};
-use pyrogen_checker::settings::flags;
 use pyrogen_checker::settings::types::SerializationFormat;
 
-use crate::diagnostics::Diagnostics;
+use crate::diagnostics::Messages;
 
 bitflags! {
     #[derive(Default, Debug, Copy, Clone)]
@@ -45,7 +41,7 @@ impl Serialize for SerializeRuleAsCode {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_str(&self.0.to_str().to_string())
+        serializer.serialize_str(self.0.to_str())
     }
 }
 
@@ -86,24 +82,18 @@ impl Printer {
         }
     }
 
-    fn write_summary_text(&self, writer: &mut dyn Write, diagnostics: &Diagnostics) -> Result<()> {
-        if self.log_level >= LogLevel::Default {
-            if self.flags.intersects(Flags::SHOW_VIOLATIONS) {
-                let remaining = diagnostics.messages.len();
-                if remaining > 0 {
-                    let s = if remaining == 1 { "" } else { "s" };
-                    writeln!(writer, "Found {remaining} error{s}.")?;
-                }
+    fn write_summary_text(&self, writer: &mut dyn Write, diagnostics: &Messages) -> Result<()> {
+        if self.log_level >= LogLevel::Default && self.flags.intersects(Flags::SHOW_VIOLATIONS) {
+            let remaining = diagnostics.messages.len();
+            if remaining > 0 {
+                let s = if remaining == 1 { "" } else { "s" };
+                writeln!(writer, "Found {remaining} error{s}.")?;
             }
         }
         Ok(())
     }
 
-    pub(crate) fn write_once(
-        &self,
-        diagnostics: &Diagnostics,
-        writer: &mut dyn Write,
-    ) -> Result<()> {
+    pub(crate) fn write_once(&self, diagnostics: &Messages, writer: &mut dyn Write) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
         }
@@ -123,6 +113,12 @@ impl Printer {
 
                 self.write_summary_text(writer, diagnostics)?;
             }
+            SerializationFormat::Json => {
+                JsonEmitter.emit(writer, &diagnostics.messages)?;
+            }
+            SerializationFormat::Github => {
+                GithubEmitter.emit(writer, &diagnostics.messages)?;
+            }
         }
 
         writer.flush()?;
@@ -132,13 +128,13 @@ impl Printer {
 
     pub(crate) fn write_statistics(
         &self,
-        diagnostics: &Diagnostics,
+        diagnostics: &Messages,
         writer: &mut dyn Write,
     ) -> Result<()> {
         let statistics: Vec<ExpandedStatistics> = diagnostics
             .messages
             .iter()
-            .map(|message| (message.kind.error_code(), &message.kind.body))
+            .map(|message| (message.diagnostic.error_code(), &message.diagnostic.body))
             .fold(vec![], |mut acc, (rule, body)| {
                 if let Some((prev_rule, _, count)) = acc.last_mut() {
                     if *prev_rule == rule {
@@ -183,18 +179,17 @@ impl Printer {
                 for statistic in statistics {
                     writeln!(
                         writer,
-                        "{:>count_width$}\t{:<code_width$}\t{}{}",
+                        "{:>count_width$}\t{:<code_width$}\t{}",
                         statistic.count.to_string().bold(),
                         statistic.code.to_string().red().bold(),
-                        "",
                         statistic.message,
                     )?;
                 }
                 return Ok(());
             }
-            // SerializationFormat::Json => {
-            //     writeln!(writer, "{}", serde_json::to_string_pretty(&statistics)?)?;
-            // }
+            SerializationFormat::Json => {
+                writeln!(writer, "{}", serde_json::to_string_pretty(&statistics)?)?;
+            }
             _ => {
                 anyhow::bail!(
                     "Unsupported serialization format for statistics: {:?}",
@@ -211,7 +206,7 @@ impl Printer {
     pub(crate) fn write_continuously(
         &self,
         writer: &mut dyn Write,
-        diagnostics: &Diagnostics,
+        diagnostics: &Messages,
     ) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());

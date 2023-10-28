@@ -3,22 +3,23 @@ use std::path::{Path, PathBuf};
 use crate::{
     registry::{ErrorCode, ErrorCodeSet},
     settings::types::PythonVersion,
+    ErrorCodeSelector,
 };
 use anyhow::Result;
 use globset::{Glob, GlobMatcher};
 use path_absolutize::path_dedot;
 use pyrogen_macros::CacheKey;
 
-use self::{rule_table::RuleTable, types::PerFileIgnore};
+use self::{code_table::ErrorCodeTable, types::PerFileIgnore};
 
+pub mod code_table;
 pub mod flags;
-pub mod rule_table;
 pub mod types;
 
 #[derive(Debug, CacheKey)]
 pub struct CheckerSettings {
     pub project_root: PathBuf,
-    pub rules: RuleTable,
+    pub table: ErrorCodeTable,
     pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, ErrorCodeSet)>,
 
     pub target_version: PythonVersion,
@@ -26,12 +27,22 @@ pub struct CheckerSettings {
     pub src: Vec<PathBuf>,
 }
 
+pub const DEFAULT_ERRORS: &[ErrorCodeSelector] = &[
+    ErrorCodeSelector::ErrorCode(ErrorCode::SyntaxError),
+    ErrorCodeSelector::ErrorCode(ErrorCode::GeneralTypeError),
+    ErrorCodeSelector::ErrorCode(ErrorCode::InvalidPyprojectToml),
+];
+pub const DEFAULT_WARNINGS: &[ErrorCodeSelector] = &[
+    ErrorCodeSelector::ErrorCode(ErrorCode::UnusedVariable),
+    ErrorCodeSelector::ErrorCode(ErrorCode::UnusedImport),
+];
+
 impl CheckerSettings {
     pub fn new(project_root: &Path) -> Self {
         Self {
             target_version: PythonVersion::default(),
             project_root: project_root.to_path_buf(),
-            rules: RuleTable::from_iter(vec![ErrorCode::SyntaxError].into_iter()),
+            table: ErrorCodeTable::from_iter(vec![ErrorCode::SyntaxError]),
             namespace_packages: vec![],
             per_file_ignores: vec![],
 
@@ -47,7 +58,7 @@ impl CheckerSettings {
 
     pub fn for_rule(rule_code: ErrorCode) -> Self {
         Self {
-            rules: RuleTable::from_iter([rule_code]),
+            table: ErrorCodeTable::from_iter([rule_code]),
             target_version: PythonVersion::latest(),
             ..Self::default()
         }
@@ -55,7 +66,7 @@ impl CheckerSettings {
 
     pub fn for_rules(rules: impl IntoIterator<Item = ErrorCode>) -> Self {
         Self {
-            rules: RuleTable::from_iter(rules),
+            table: ErrorCodeTable::from_iter(rules),
             target_version: PythonVersion::latest(),
             ..Self::default()
         }

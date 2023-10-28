@@ -1,15 +1,16 @@
 use std::error::Error;
-use std::fmt::{Display, Write};
+use std::fmt::Display;
 use std::ops::Add;
 use std::path::Path;
+use std::str::FromStr;
 
 use anyhow::Result;
 use log::warn;
 use rustpython_parser::ast::Ranged;
 use rustpython_parser::text_size::{TextLen, TextRange, TextSize};
 
-use pyrogen_python_trivia::{indentation_at_offset, CommentRanges};
-use pyrogen_source_file::{Locator, TextRangeWrapper};
+use pyrogen_python_trivia::CommentRanges;
+use pyrogen_source_file::Locator;
 
 use crate::fs::relativize_path;
 use crate::registry::ErrorCode;
@@ -215,21 +216,20 @@ pub(crate) struct Codes<'a> {
 }
 
 impl Codes<'_> {
-    /// The codes that are ignored by the `noqa` directive.
+    /// The codes that are ignored by the `type: ignore` directive.
     pub(crate) fn codes(&self) -> &[&str] {
         &self.codes
     }
 }
 
 impl Ranged for Codes<'_> {
-    /// The range of the `noqa` directive.
+    /// The range of the `type: ignore` directive.
     fn range(&self) -> TextRange {
         self.range
     }
 }
 
-/// Returns `true` if the string list of `codes` includes `code` (or an alias
-/// thereof).
+/// Returns `true` if the string list of `codes` includes `code`.
 pub(crate) fn includes(needle: ErrorCode, haystack: &[&str]) -> bool {
     let needle = needle.to_str();
     haystack.iter().any(|&candidate| needle == candidate)
@@ -239,15 +239,12 @@ pub(crate) fn includes(needle: ErrorCode, haystack: &[&str]) -> bool {
 pub(crate) fn rule_is_ignored(
     code: ErrorCode,
     offset: TextSize,
-    noqa_line_for: &NoqaMapping,
+    noqa_line_for: &TypeIgnoreMapping,
     locator: &Locator,
 ) -> bool {
     let offset = noqa_line_for.resolve(offset);
     let line_range = locator.line_range(offset);
-    match Directive::try_extract(
-        locator.slice(TextRangeWrapper::wrap(line_range)),
-        line_range.start(),
-    ) {
+    match Directive::try_extract(locator.slice(line_range), line_range.start()) {
         Ok(Some(Directive::All(_))) => true,
         Ok(Some(Directive::Codes(Codes { codes, range: _ }))) => includes(code, &codes),
         _ => false,
@@ -366,7 +363,7 @@ impl Display for ParseError {
 impl Error for ParseError {}
 
 #[derive(Debug)]
-pub(crate) struct NoqaDirectiveLine<'a> {
+pub(crate) struct TypeIgnoreLine<'a> {
     /// The range of the text line for which the noqa directive applies.
     pub(crate) range: TextRange,
     /// The noqa directive.
@@ -375,7 +372,7 @@ pub(crate) struct NoqaDirectiveLine<'a> {
     pub(crate) matches: Vec<&'static str>,
 }
 
-impl Ranged for NoqaDirectiveLine<'_> {
+impl Ranged for TypeIgnoreLine<'_> {
     /// The range of the `noqa` directive.
     fn range(&self) -> TextRange {
         self.range
@@ -383,11 +380,11 @@ impl Ranged for NoqaDirectiveLine<'_> {
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct NoqaDirectives<'a> {
-    inner: Vec<NoqaDirectiveLine<'a>>,
+pub(crate) struct TypeIgnores<'a> {
+    inner: Vec<TypeIgnoreLine<'a>>,
 }
 
-impl<'a> NoqaDirectives<'a> {
+impl<'a> TypeIgnores<'a> {
     pub(crate) fn from_commented_ranges(
         comment_ranges: &CommentRanges,
         path: &Path,
@@ -396,10 +393,7 @@ impl<'a> NoqaDirectives<'a> {
         let mut directives = Vec::new();
 
         for range in comment_ranges {
-            match Directive::try_extract(
-                locator.slice(TextRangeWrapper::wrap(*range)),
-                range.start(),
-            ) {
+            match Directive::try_extract(locator.slice(*range), range.start()) {
                 Err(err) => {
                     #[allow(deprecated)]
                     let line = locator.compute_line_index(range.start());
@@ -408,7 +402,7 @@ impl<'a> NoqaDirectives<'a> {
                 }
                 Ok(Some(directive)) => {
                     // noqa comments are guaranteed to be single line.
-                    directives.push(NoqaDirectiveLine {
+                    directives.push(TypeIgnoreLine {
                         range: locator.line_range(range.start()),
                         directive,
                         matches: Vec::new(),
@@ -428,14 +422,14 @@ impl<'a> NoqaDirectives<'a> {
         Self { inner: directives }
     }
 
-    pub(crate) fn find_line_with_directive(&self, offset: TextSize) -> Option<&NoqaDirectiveLine> {
+    pub(crate) fn find_line_with_directive(&self, offset: TextSize) -> Option<&TypeIgnoreLine> {
         self.find_line_index(offset).map(|index| &self.inner[index])
     }
 
     pub(crate) fn find_line_with_directive_mut(
         &mut self,
         offset: TextSize,
-    ) -> Option<&mut NoqaDirectiveLine<'a>> {
+    ) -> Option<&mut TypeIgnoreLine<'a>> {
         if let Some(index) = self.find_line_index(offset) {
             Some(&mut self.inner[index])
         } else {
@@ -457,19 +451,19 @@ impl<'a> NoqaDirectives<'a> {
             .ok()
     }
 
-    pub(crate) fn lines(&self) -> &[NoqaDirectiveLine] {
+    pub(crate) fn lines(&self) -> &[TypeIgnoreLine] {
         &self.inner
     }
 }
 
-/// Remaps offsets falling into one of the ranges to instead check for a noqa comment on the
-/// line specified by the offset.
+/// Remaps offsets falling into one of the ranges to instead check for a "type: ignore" comment on
+/// the line specified by the offset.
 #[derive(Debug, Default, PartialEq, Eq)]
-pub struct NoqaMapping {
+pub struct TypeIgnoreMapping {
     ranges: Vec<TextRange>,
 }
 
-impl NoqaMapping {
+impl TypeIgnoreMapping {
     pub(crate) fn with_capacity(capacity: usize) -> Self {
         Self {
             ranges: Vec::with_capacity(capacity),
@@ -516,9 +510,9 @@ impl NoqaMapping {
     }
 }
 
-impl FromIterator<TextRange> for NoqaMapping {
+impl FromIterator<TextRange> for TypeIgnoreMapping {
     fn from_iter<T: IntoIterator<Item = TextRange>>(iter: T) -> Self {
-        let mut mappings = NoqaMapping::default();
+        let mut mappings = TypeIgnoreMapping::default();
 
         for range in iter {
             mappings.push_mapping(range);

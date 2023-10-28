@@ -1,0 +1,39 @@
+[package]
+name = "pyrogen_wasm"
+version = "0.0.0"
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+description = "WebAssembly bindings for pyrogen"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["console_error_panic_hook"]
+
+[dependencies]
+pyrogen_checker = { path = "../pyrogen_checker" }
+pyrogen_python_ast = { path = "../pyrogen_python_ast" }
+# pyrogen_python_codegen = { path = "../pyrogen_python_codegen" }
+pyrogen_python_index = { path = "../pyrogen_python_index" }
+pyrogen_source_file = { path = "../pyrogen_source_file" }
+pyrogen_python_trivia = { path = "../pyrogen_python_trivia" }
+pyrogen_workspace = { path = "../pyrogen_workspace" }
+
+console_error_panic_hook = { version = "0.1.7", optional = true }
+console_log = { version = "1.0.0" }
+log = { workspace = true }
+rustpython-parser = { workspace = true }
+rustpython-ast = { workspace = true }
+
+serde = { workspace = true }
+serde-wasm-bindgen = { version = "0.6.0" }
+wasm-bindgen = { version = "0.2.84" }
+js-sys = { version = "0.3.61" }
+
+[dev-dependencies]
+wasm-bindgen-test = { version = "0.3.34" }

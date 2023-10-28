@@ -3,37 +3,45 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use std::ops::Deref;
 
-use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Ranged;
 use rustpython_parser::text_size::{TextRange, TextSize};
 
 use pyrogen_source_file::{SourceFile, SourceLocation};
+
+pub use github::GithubEmitter;
+pub use json::JsonEmitter;
 pub use text::TextEmitter;
 
 use crate::registry::{Diagnostic, DiagnosticKind};
+use crate::settings::code_table::MessageKind;
 
 // mod diff;
+mod github;
+mod json;
 mod text;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Message {
-    pub kind: DiagnosticKind,
+    pub diagnostic: DiagnosticKind,
     pub range: TextRange,
     pub file: SourceFile,
-    pub noqa_offset: TextSize,
+    pub ignore_offset: TextSize,
+    pub kind: MessageKind,
 }
 
 impl Message {
     pub fn from_diagnostic(
         diagnostic: Diagnostic,
         file: SourceFile,
-        noqa_offset: TextSize,
+        ignore_offset: TextSize,
+        kind: MessageKind,
     ) -> Self {
         Self {
             range: diagnostic.range(),
-            kind: diagnostic.kind,
+            diagnostic: diagnostic.kind,
             file,
-            noqa_offset,
+            ignore_offset,
+            kind,
         }
     }
 
@@ -105,7 +113,6 @@ pub trait Emitter {
 
 #[cfg(test)]
 mod tests {
-    use rustc_hash::FxHashMap;
     use rustpython_parser::ast::Ranged;
     use rustpython_parser::text_size::{TextRange, TextSize};
 
@@ -113,6 +120,7 @@ mod tests {
 
     use crate::message::{Emitter, Message};
     use crate::registry::{Diagnostic, DiagnosticKind, ErrorCode};
+    use crate::settings::code_table::MessageKind;
 
     pub(super) fn create_messages() -> Vec<Message> {
         let fib = r#"import os
@@ -163,9 +171,24 @@ def fibonacci(n):
         let unused_variable_start = unused_variable.start();
         let undefined_name_start = undefined_name.start();
         vec![
-            Message::from_diagnostic(unused_import, fib_source.clone(), unused_import_start),
-            Message::from_diagnostic(unused_variable, fib_source, unused_variable_start),
-            Message::from_diagnostic(undefined_name, file_2_source, undefined_name_start),
+            Message::from_diagnostic(
+                unused_import,
+                fib_source.clone(),
+                unused_import_start,
+                MessageKind::Warning,
+            ),
+            Message::from_diagnostic(
+                unused_variable,
+                fib_source,
+                unused_variable_start,
+                MessageKind::Warning,
+            ),
+            Message::from_diagnostic(
+                undefined_name,
+                file_2_source,
+                undefined_name_start,
+                MessageKind::Error,
+            ),
         ]
     }
 

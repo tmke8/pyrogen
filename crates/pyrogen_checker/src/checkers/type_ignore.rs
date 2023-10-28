@@ -1,6 +1,7 @@
 //! `NoQA` enforcement and validation.
 
 use std::path::Path;
+use std::str::FromStr;
 
 use itertools::Itertools;
 use rustpython_parser::ast::Ranged;
@@ -11,7 +12,7 @@ use pyrogen_source_file::Locator;
 use crate::registry::{AsErrorCode, Diagnostic, DiagnosticKind, ErrorCode};
 use crate::settings::CheckerSettings;
 use crate::type_ignore;
-use crate::type_ignore::{Directive, FileExemption, NoqaDirectives, NoqaMapping};
+use crate::type_ignore::{Directive, FileExemption, TypeIgnoreMapping, TypeIgnores};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct UnusedCodes {
@@ -32,7 +33,7 @@ pub(crate) fn check_type_ignore(
     path: &Path,
     locator: &Locator,
     comment_ranges: &CommentRanges,
-    noqa_line_for: &NoqaMapping,
+    noqa_line_for: &TypeIgnoreMapping,
     analyze_directives: bool,
     settings: &CheckerSettings,
 ) -> Vec<usize> {
@@ -40,7 +41,7 @@ pub(crate) fn check_type_ignore(
     let exemption = FileExemption::try_extract(locator.contents(), comment_ranges, path, locator);
 
     // Extract all `noqa` directives.
-    let mut noqa_directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
+    let mut noqa_directives = TypeIgnores::from_commented_ranges(comment_ranges, path, locator);
 
     // Indices of diagnostics that were ignored by a `noqa` directive.
     let mut ignored_diagnostics = vec![];
@@ -103,7 +104,7 @@ pub(crate) fn check_type_ignore(
 
     // Enforce that the noqa directive was actually used (RUF100), unless RUF100 was itself
     // suppressed.
-    if settings.rules.enabled(ErrorCode::UnusedTypeIgnore)
+    if settings.table.enabled(ErrorCode::UnusedTypeIgnore)
         && analyze_directives
         && !exemption.is_some_and(|exemption| match exemption {
             FileExemption::All => true,
@@ -114,7 +115,7 @@ pub(crate) fn check_type_ignore(
             match &line.directive {
                 Directive::All(directive) => {
                     if line.matches.is_empty() {
-                        let mut diagnostic =
+                        let diagnostic =
                             Diagnostic::new(unused_type_ignore(None), directive.range());
                         diagnostics.push(diagnostic);
                     }
@@ -133,16 +134,14 @@ pub(crate) fn check_type_ignore(
 
                         if line.matches.iter().any(|match_| *match_ == code) {
                             valid_codes.push(code);
-                        } else {
-                            if let Ok(rule) = ErrorCode::from_str(code) {
-                                if settings.rules.enabled(rule) {
-                                    unmatched_codes.push(code);
-                                } else {
-                                    disabled_codes.push(code);
-                                }
+                        } else if let Ok(rule) = ErrorCode::from_str(code) {
+                            if settings.table.enabled(rule) {
+                                unmatched_codes.push(code);
                             } else {
-                                unknown_codes.push(code);
+                                disabled_codes.push(code);
                             }
+                        } else {
+                            unknown_codes.push(code);
                         }
                     }
 
@@ -154,7 +153,7 @@ pub(crate) fn check_type_ignore(
                         && unknown_codes.is_empty()
                         && unmatched_codes.is_empty())
                     {
-                        let mut diagnostic = Diagnostic::new(
+                        let diagnostic = Diagnostic::new(
                             unused_type_ignore(Some(UnusedCodes {
                                 disabled: disabled_codes
                                     .iter()

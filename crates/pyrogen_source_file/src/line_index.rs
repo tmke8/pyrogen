@@ -69,8 +69,8 @@ impl LineIndex {
     /// ## Examples
     ///
     /// ```
-    /// # use ruff_text_size::TextSize;
-    /// # use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
+    /// # use rustpython_parser::text_size::TextSize;
+    /// # use pyrogen_source_file::{LineIndex, OneIndexed, SourceLocation};
     /// let source = "def a():\n    pass";
     /// let index = LineIndex::from_source_text(source);
     ///
@@ -133,8 +133,8 @@ impl LineIndex {
     /// ## Examples
     ///
     /// ```
-    /// # use ruff_text_size::TextSize;
-    /// # use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
+    /// # use rustpython_parser::text_size::TextSize;
+    /// # use pyrogen_source_file::{LineIndex, OneIndexed, SourceLocation};
     /// let source = "def a():\n    pass";
     /// let index = LineIndex::from_source_text(source);
     ///

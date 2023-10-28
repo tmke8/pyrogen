@@ -23,9 +23,9 @@ impl FromStr for ErrorCodeSelector {
             "ALL" => Ok(Self::All),
             _ => {
                 // Does the selector select a single error code?
-                let prefix =
-                    ErrorCode::from_str(&s).map_err(|_| ParseError::Unknown(s.to_string()))?;
-                Ok(Self::ErrorCode(prefix))
+                let error_code =
+                    ErrorCode::from_str(s).map_err(|_| ParseError::Unknown(s.to_string()))?;
+                Ok(Self::ErrorCode(error_code))
             }
         }
     }
@@ -51,8 +51,7 @@ impl Serialize for ErrorCodeSelector {
     where
         S: serde::Serializer,
     {
-        let code = self.code();
-        serializer.serialize_str(&format!("{code}"))
+        serializer.serialize_str(self.code())
     }
 }
 
@@ -102,7 +101,7 @@ impl ErrorCodeSelector {
     }
 
     /// Returns rules matching the selector, taking into account preview options enabled.
-    pub fn rules<'a>(&'a self) -> impl Iterator<Item = ErrorCode> + 'a {
+    pub fn rules(&self) -> impl Iterator<Item = ErrorCode> + '_ {
         self.all_rules()
     }
 }
@@ -131,7 +130,7 @@ mod schema {
     use schemars::schema::{InstanceType, Schema, SchemaObject};
     use strum::IntoEnumIterator;
 
-    use crate::rule_selector::{Linter, RuleCodePrefix};
+    use crate::code_selector::{Linter, RuleCodePrefix};
     use crate::ErrorCodeSelector;
 
     impl JsonSchema for ErrorCodeSelector {
@@ -194,18 +193,69 @@ impl ErrorCodeSelector {
 pub enum Specificity {
     /// The specificity when selecting all rules (e.g., `--select ALL`).
     All,
-    /// The specificity when selecting a legacy linter group (e.g., `--select C` or `--select T`).
-    LinterGroup,
-    /// The specificity when selecting a linter (e.g., `--select PLE` or `--select UP`).
-    Linter,
-    /// The specificity when selecting via a rule prefix with a one-character code (e.g., `--select PLE1`).
-    Prefix1Char,
-    /// The specificity when selecting via a rule prefix with a two-character code (e.g., `--select PLE12`).
-    Prefix2Chars,
-    /// The specificity when selecting via a rule prefix with a three-character code (e.g., `--select PLE123`).
-    Prefix3Chars,
-    /// The specificity when selecting via a rule prefix with a four-character code (e.g., `--select PLE1234`).
-    Prefix4Chars,
+    // /// The specificity when selecting a legacy linter group (e.g., `--select C` or `--select T`).
+    // LinterGroup,
     /// The specificity when selecting an individual rule (e.g., `--select PLE1205`).
     Rule,
+}
+
+#[cfg(feature = "clap")]
+pub mod clap_completion {
+    use clap::builder::{PossibleValue, TypedValueParser, ValueParserFactory};
+    use strum::IntoEnumIterator;
+
+    use crate::{registry::ErrorCode, ErrorCodeSelector};
+
+    #[derive(Clone)]
+    pub struct ErrorCodeSelectorParser;
+
+    impl ValueParserFactory for ErrorCodeSelector {
+        type Parser = ErrorCodeSelectorParser;
+
+        fn value_parser() -> Self::Parser {
+            ErrorCodeSelectorParser
+        }
+    }
+
+    impl TypedValueParser for ErrorCodeSelectorParser {
+        type Value = ErrorCodeSelector;
+
+        fn parse_ref(
+            &self,
+            cmd: &clap::Command,
+            arg: Option<&clap::Arg>,
+            value: &std::ffi::OsStr,
+        ) -> Result<Self::Value, clap::Error> {
+            let value = value
+                .to_str()
+                .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
+
+            value.parse().map_err(|_| {
+                let mut error =
+                    clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
+                if let Some(arg) = arg {
+                    error.insert(
+                        clap::error::ContextKind::InvalidArg,
+                        clap::error::ContextValue::String(arg.to_string()),
+                    );
+                }
+                error.insert(
+                    clap::error::ContextKind::InvalidValue,
+                    clap::error::ContextValue::String(value.to_string()),
+                );
+                error
+            })
+        }
+
+        fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
+            Some(Box::new(
+                std::iter::once(PossibleValue::new("ALL").help("all rules")).chain(
+                    ErrorCode::iter().map(|rule| {
+                        let name = rule.to_string();
+                        PossibleValue::new(name)
+                    }),
+                ),
+            ))
+        }
+    }
 }

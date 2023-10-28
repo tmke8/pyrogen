@@ -3,25 +3,22 @@ use std::fmt::{Display, Formatter};
 use std::io::Write;
 
 use annotate_snippets::display_list::{DisplayList, FormatOptions};
-use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
+use annotate_snippets::snippet::{AnnotationType, Slice, Snippet, SourceAnnotation};
 use bitflags::bitflags;
 use colored::Colorize;
 
-use pyrogen_source_file::{OneIndexed, TextRangeWrapper};
+use pyrogen_source_file::OneIndexed;
 use rustpython_parser::text_size::{TextRange, TextSize};
 
 use crate::fs::relativize_path;
 use crate::line_width::{LineWidthBuilder, TabSize};
 use crate::message::{Emitter, Message};
 use crate::registry::AsErrorCode;
+use crate::settings::code_table::MessageKind;
 
 bitflags! {
     #[derive(Default)]
     struct EmitterFlags: u8 {
-        /// Whether to show the fix status of a diagnostic.
-        const SHOW_FIX_STATUS = 0b0000_0001;
-        /// Whether to show the diff of a fix, for diagnostics that have a fix.
-        const SHOW_FIX_DIFF   = 0b0000_0010;
         /// Whether to show the source code of a diagnostic.
         const SHOW_SOURCE     = 0b0000_0100;
     }
@@ -33,19 +30,6 @@ pub struct TextEmitter {
 }
 
 impl TextEmitter {
-    #[must_use]
-    pub fn with_show_fix_status(mut self, show_fix_status: bool) -> Self {
-        self.flags
-            .set(EmitterFlags::SHOW_FIX_STATUS, show_fix_status);
-        self
-    }
-
-    #[must_use]
-    pub fn with_show_fix_diff(mut self, show_fix_diff: bool) -> Self {
-        self.flags.set(EmitterFlags::SHOW_FIX_DIFF, show_fix_diff);
-        self
-    }
-
     #[must_use]
     pub fn with_show_source(mut self, show_source: bool) -> Self {
         self.flags.set(EmitterFlags::SHOW_SOURCE, show_source);
@@ -91,14 +75,26 @@ pub(super) struct RuleCodeAndBody<'a> {
 
 impl Display for RuleCodeAndBody<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let kind = &self.message.kind;
+        let diagnostic = &self.message.diagnostic;
 
-        write!(
-            f,
-            "{body} [{code}]",
-            code = kind.error_code().to_string().red().bold(),
-            body = kind.body,
-        )
+        match &self.message.kind {
+            MessageKind::Error => {
+                write!(
+                    f,
+                    "error: {body} [{code}]",
+                    code = diagnostic.error_code().to_string().red().bold(),
+                    body = diagnostic.body,
+                )
+            }
+            MessageKind::Warning => {
+                write!(
+                    f,
+                    "warn: {body} [{code}]",
+                    code = diagnostic.error_code().to_string().yellow().bold(),
+                    body = diagnostic.body,
+                )
+            }
+        }
     }
 }
 
@@ -109,7 +105,10 @@ pub(super) struct MessageCodeFrame<'a> {
 impl Display for MessageCodeFrame<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let Message {
-            kind, file, range, ..
+            diagnostic: kind,
+            file,
+            range,
+            ..
         } = self.message;
 
         let footer = Vec::new();
@@ -145,7 +144,7 @@ impl Display for MessageCodeFrame<'_> {
         let end_offset = source_code.line_end(end_index);
 
         let source = replace_whitespace(
-            source_code.slice(TextRangeWrapper::new(start_offset, end_offset)),
+            source_code.slice(TextRange::new(start_offset, end_offset)),
             range - start_offset,
         );
 
@@ -247,16 +246,6 @@ mod tests {
     #[test]
     fn default() {
         let mut emitter = TextEmitter::default().with_show_source(true);
-        let content = capture_emitter_output(&mut emitter, &create_messages());
-
-        assert_snapshot!(content);
-    }
-
-    #[test]
-    fn fix_status() {
-        let mut emitter = TextEmitter::default()
-            .with_show_fix_status(true)
-            .with_show_source(true);
         let content = capture_emitter_output(&mut emitter, &create_messages());
 
         assert_snapshot!(content);

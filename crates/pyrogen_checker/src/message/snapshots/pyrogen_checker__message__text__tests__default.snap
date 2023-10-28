@@ -1,0 +1,27 @@
+---
+source: crates/pyrogen_checker/src/message/text.rs
+expression: content
+---
+fib.py:1:8: warn: `os` imported but unused [unused-import]
+  |
+1 | import os
+  |        ^^ unused-import
+  |
+
+fib.py:6:5: warn: Local variable `x` is assigned to but never used [unused-variable]
+  |
+4 | def fibonacci(n):
+5 |     """Compute the nth number in the Fibonacci sequence."""
+6 |     x = 1
+  |     ^ unused-variable
+7 |     if n == 0:
+8 |         return 0
+  |
+
+undef.py:1:4: error: Undefined name `a` [undefined-name]
+  |
+1 | if a == 1: pass
+  |    ^ undefined-name
+  |
+
+

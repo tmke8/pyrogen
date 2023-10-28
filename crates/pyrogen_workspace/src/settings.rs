@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use path_absolutize::path_dedot;
 use pyrogen_cache::cache_dir;
 use pyrogen_checker::settings::{
-    types::{FilePattern, FilePatternSet},
+    types::{FilePattern, FilePatternSet, SerializationFormat},
     CheckerSettings,
 };
 use pyrogen_macros::CacheKey;
@@ -12,8 +12,10 @@ use pyrogen_macros::CacheKey;
 pub struct Settings {
     #[cache_key(ignore)]
     pub cache_dir: PathBuf,
-    pub file_resolver: FileResolverSettings,
+    #[cache_key(ignore)]
+    pub output_format: SerializationFormat,
 
+    pub file_resolver: FileResolverSettings,
     pub checker: CheckerSettings,
 }
 
@@ -24,6 +26,7 @@ impl Default for Settings {
             cache_dir: cache_dir(project_root),
             checker: CheckerSettings::new(project_root),
             file_resolver: FileResolverSettings::new(project_root),
+            output_format: SerializationFormat::default(),
         }
     }
 }
@@ -65,6 +68,7 @@ pub(crate) static INCLUDE: &[FilePattern] = &[
 #[derive(Debug, CacheKey)]
 pub struct FileResolverSettings {
     pub exclude: FilePatternSet,
+    pub extend_exclude: FilePatternSet,
     pub force_exclude: bool,
     pub include: FilePatternSet,
     pub respect_gitignore: bool,
@@ -76,6 +80,7 @@ impl FileResolverSettings {
         Self {
             project_root: project_root.to_path_buf(),
             exclude: FilePatternSet::try_from_iter(EXCLUDE.iter().cloned()).unwrap(),
+            extend_exclude: FilePatternSet::default(),
             force_exclude: false,
             respect_gitignore: true,
             include: FilePatternSet::try_from_iter(INCLUDE.iter().cloned()).unwrap(),

@@ -57,9 +57,9 @@ pub trait AsErrorCode {
 }
 
 impl ErrorCode {
-    pub fn from_str(code: &str) -> Result<Self, FromCodeError> {
-        code.to_owned().parse().map_err(|x| FromCodeError::Unknown)
-    }
+    // pub fn from_str(code: &str) -> Result<Self, FromCodeError> {
+    //     code.to_owned().parse().map_err(|x| FromCodeError::Unknown)
+    // }
 
     pub fn to_str(&self) -> &'static str {
         self.into()
@@ -67,6 +67,7 @@ impl ErrorCode {
 }
 
 impl AsErrorCode for DiagnosticKind {
+    #[inline]
     fn error_code(&self) -> ErrorCode {
         self.error_code
     }
@@ -152,6 +153,7 @@ impl Ranged for Diagnostic {
 #[cfg(feature = "clap")]
 pub mod clap_completion {
     use clap::builder::{PossibleValue, TypedValueParser, ValueParserFactory};
+    use std::str::FromStr;
     use strum::IntoEnumIterator;
 
     use crate::registry::ErrorCode;
@@ -198,8 +200,8 @@ pub mod clap_completion {
         }
 
         fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
-            Some(Box::new(ErrorCode::iter().map(|rule| {
-                let name = rule.to_string();
+            Some(Box::new(ErrorCode::iter().map(|error_code| {
+                let name = error_code.to_string();
                 PossibleValue::new(name)
             })))
         }
@@ -209,6 +211,7 @@ pub mod clap_completion {
 #[cfg(test)]
 mod tests {
     use std::mem::size_of;
+    use std::str::FromStr;
 
     use strum::IntoEnumIterator;
 
@@ -216,18 +219,18 @@ mod tests {
 
     #[test]
     fn check_code_serialization() {
-        for rule in ErrorCode::iter() {
+        for error_code in ErrorCode::iter() {
             assert!(
-                ErrorCode::from_str(&format!("{}", rule.to_string())).is_ok(),
-                "{rule:?} could not be round-trip serialized."
+                ErrorCode::from_str(&format!("{}", error_code)).is_ok(),
+                "{error_code:?} could not be round-trip serialized."
             );
         }
     }
 
     #[test]
     fn test_linter_parse_code() {
-        for rule in ErrorCode::iter() {
-            let code = format!("{}", rule.to_string());
+        for error_code in ErrorCode::iter() {
+            let code = format!("{}", error_code);
             let linter: ErrorCode = code
                 .parse()
                 .unwrap_or_else(|err| panic!("couldn't parse {code:?}"));

@@ -44,7 +44,11 @@ similar = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
 unicode-width = { workspace = true }
+serde_json = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }
 test-case = { workspace = true }
+
+[features]
+default = []

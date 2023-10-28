@@ -1,0 +1,6 @@
+---
+source: crates/pyrogen_cli/src/commands/check.rs
+---
+/home/ferris/project/code.py:1:1: error: Permission denied (os error 13) [io-error]
+/home/ferris/project/pyproject.toml:1:1: error: Permission denied (os error 13) [io-error]
+
