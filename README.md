@@ -22,5 +22,5 @@ maturin develop
 
 Then run with
 ```
-python -m pyrogen
+python -m pyrogen_check
 ```
