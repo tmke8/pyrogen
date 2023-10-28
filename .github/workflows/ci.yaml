@@ -104,6 +104,6 @@ jobs:
         run: |
           pip install --force-reinstall --find-links dist ${{ env.PACKAGE_NAME }}
           pyrogen --help
-          python -m pyrogen --help
+          python -m pyrogen_check --help
       - name: "Remove wheels from cache"
         run: rm -rf target/wheels
