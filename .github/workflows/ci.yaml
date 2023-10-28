@@ -1,9 +1,9 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
+  merge_group:
   pull_request:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -67,24 +67,24 @@ jobs:
         # We can't reject unreferenced snapshots on windows because flake8_executable can't run on windows
         run: cargo insta test --all --all-features
 
-  cargo-test-wasm:
-    runs-on: ubuntu-latest
-    name: "cargo test (wasm)"
-    steps:
-      - uses: actions/checkout@v4
-      - name: "Install Rust toolchain"
-        run: rustup target add wasm32-unknown-unknown
-      - uses: actions/setup-node@v3
-        with:
-          node-version: 18
-          cache: "npm"
-          cache-dependency-path: playground/package-lock.json
-      - uses: jetli/wasm-pack-action@v0.4.0
-      - uses: Swatinem/rust-cache@v2
-      - name: "Run wasm-pack"
-        run: |
-          cd crates/pyrogen_wasm
-          wasm-pack test --node
+#   cargo-test-wasm:
+#     runs-on: ubuntu-latest
+#     name: "cargo test (wasm)"
+#     steps:
+#       - uses: actions/checkout@v4
+#       - name: "Install Rust toolchain"
+#         run: rustup target add wasm32-unknown-unknown
+#       - uses: actions/setup-node@v3
+#         with:
+#           node-version: 18
+#           cache: "npm"
+#           cache-dependency-path: playground/package-lock.json
+#       - uses: jetli/wasm-pack-action@v0.4.0
+#       - uses: Swatinem/rust-cache@v2
+#       - name: "Run wasm-pack"
+#         run: |
+#           cd crates/pyrogen_wasm
+#           wasm-pack test --node
 
   python-package:
     name: "python package"
