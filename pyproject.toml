@@ -3,7 +3,7 @@ requires = ["maturin>=1.2,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "pyrogen"
+name = "pyrogen-check"
 version = "0.1.0"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -20,6 +20,7 @@ Repository = "https://github.com/tmke8/pyrogen"
 [tool.maturin]
 bindings = "bin"
 manifest-path = "crates/pyrogen_cli/Cargo.toml"
-module-name = "pyrogen"
+module-name = "pyrogen_check"
 python-source = "python"
 strip = true
+exclude = ["crates/pyrogen_checker/resources/test/fixtures/**/*"]
