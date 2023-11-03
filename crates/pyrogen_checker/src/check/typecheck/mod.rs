@@ -28,7 +28,7 @@ pub(crate) fn check_ast(
     indexer: &Indexer,
     noqa_line_for: &TypeIgnoreMapping,
     settings: &CheckerSettings,
-    noqa: flags::TypeIgnore,
+    respect_type_ignore: flags::TypeIgnore,
     path: &Path,
     package: Option<&Path>,
     source_type: PySourceType,

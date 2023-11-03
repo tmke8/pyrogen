@@ -1,4 +1,4 @@
-//! `NoQA` enforcement and validation.
+//! `type: ignore` enforcement and validation.
 
 use std::path::Path;
 use std::str::FromStr;
@@ -15,16 +15,26 @@ use crate::type_ignore;
 use crate::type_ignore::{Directive, FileExemption, TypeIgnoreMapping, TypeIgnores};
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct UnusedCodes {
+struct UnusedCodes {
     pub unknown: Vec<String>,
-    pub disabled: Vec<String>,
-    pub unmatched: Vec<String>,
+    pub disabled: Vec<ErrorCode>,
+    pub unmatched: Vec<ErrorCode>,
 }
 
-fn unused_type_ignore(codes: Option<UnusedCodes>) -> DiagnosticKind {
-    DiagnosticKind {
-        body: format!("Unused type ignore directive, with codes: {:?}", codes),
-        error_code: ErrorCode::UnusedTypeIgnore,
+fn unused_type_ignore(codes: Option<Vec<ErrorCode>>) -> DiagnosticKind {
+    if let Some(codes) = codes {
+        DiagnosticKind {
+            body: format!(
+                "Type ignore directive has unused codes: {}",
+                collect_rule_codes(codes)
+            ),
+            error_code: ErrorCode::UnusedTypeIgnore,
+        }
+    } else {
+        DiagnosticKind {
+            body: "Unused type ignore directive".to_string(),
+            error_code: ErrorCode::UnusedTypeIgnore,
+        }
     }
 }
 
@@ -43,7 +53,7 @@ pub(crate) fn check_type_ignore(
     // Extract all `noqa` directives.
     let mut noqa_directives = TypeIgnores::from_commented_ranges(comment_ranges, path, locator);
 
-    // Indices of diagnostics that were ignored by a `noqa` directive.
+    // Indices of diagnostics that were ignored by a `type: ignore` directive.
     let mut ignored_diagnostics = vec![];
 
     // Remove any ignored diagnostics.
@@ -56,7 +66,7 @@ pub(crate) fn check_type_ignore(
             }
             Some(FileExemption::Codes(codes)) => {
                 // If the diagnostic is ignored by a global exemption, ignore it.
-                if codes.contains(&diagnostic.kind.error_code().to_str()) {
+                if codes.contains(&diagnostic.kind.error_code()) {
                     ignored_diagnostics.push(index);
                     continue;
                 }
@@ -76,17 +86,13 @@ pub(crate) fn check_type_ignore(
             {
                 let suppressed = match &directive_line.directive {
                     Directive::All(_) => {
-                        directive_line
-                            .matches
-                            .push(diagnostic.kind.error_code().to_str());
+                        directive_line.matches.push(diagnostic.kind.error_code());
                         ignored_diagnostics.push(index);
                         true
                     }
                     Directive::Codes(directive) => {
                         if type_ignore::includes(diagnostic.kind.error_code(), directive.codes()) {
-                            directive_line
-                                .matches
-                                .push(diagnostic.kind.error_code().to_str());
+                            directive_line.matches.push(diagnostic.kind.error_code());
                             ignored_diagnostics.push(index);
                             true
                         } else {
@@ -102,13 +108,12 @@ pub(crate) fn check_type_ignore(
         }
     }
 
-    // Enforce that the noqa directive was actually used (RUF100), unless RUF100 was itself
-    // suppressed.
+    // Enforce that the `type: ignore` directive was actually used.
     if settings.table.enabled(ErrorCode::UnusedTypeIgnore)
         && analyze_directives
         && !exemption.is_some_and(|exemption| match exemption {
             FileExemption::All => true,
-            FileExemption::Codes(codes) => codes.contains(&ErrorCode::UnusedTypeIgnore.to_str()),
+            FileExemption::Codes(codes) => codes.contains(&ErrorCode::UnusedTypeIgnore),
         })
     {
         for line in noqa_directives.lines() {
@@ -124,7 +129,6 @@ pub(crate) fn check_type_ignore(
                     let mut disabled_codes = vec![];
                     let mut unknown_codes = vec![];
                     let mut unmatched_codes = vec![];
-                    let mut valid_codes = vec![];
                     let mut self_ignore = false;
                     for &code in directive.codes() {
                         if ErrorCode::UnusedTypeIgnore.to_str() == code {
@@ -132,13 +136,13 @@ pub(crate) fn check_type_ignore(
                             break;
                         }
 
-                        if line.matches.iter().any(|match_| *match_ == code) {
-                            valid_codes.push(code);
-                        } else if let Ok(rule) = ErrorCode::from_str(code) {
-                            if settings.table.enabled(rule) {
-                                unmatched_codes.push(code);
-                            } else {
-                                disabled_codes.push(code);
+                        if let Ok(rule) = ErrorCode::from_str(code) {
+                            if !line.matches.iter().any(|match_| *match_ == rule) {
+                                if settings.table.enabled(rule) {
+                                    unmatched_codes.push(rule);
+                                } else {
+                                    disabled_codes.push(rule);
+                                }
                             }
                         } else {
                             unknown_codes.push(code);
@@ -149,28 +153,23 @@ pub(crate) fn check_type_ignore(
                         continue;
                     }
 
-                    if !(disabled_codes.is_empty()
-                        && unknown_codes.is_empty()
-                        && unmatched_codes.is_empty())
-                    {
-                        let diagnostic = Diagnostic::new(
-                            unused_type_ignore(Some(UnusedCodes {
-                                disabled: disabled_codes
-                                    .iter()
-                                    .map(|code| (*code).to_string())
-                                    .collect(),
-                                unknown: unknown_codes
-                                    .iter()
-                                    .map(|code| (*code).to_string())
-                                    .collect(),
-                                unmatched: unmatched_codes
-                                    .iter()
-                                    .map(|code| (*code).to_string())
-                                    .collect(),
-                            })),
+                    if !unmatched_codes.is_empty() {
+                        diagnostics.push(Diagnostic::new(
+                            unused_type_ignore(Some(unmatched_codes)),
                             directive.range(),
-                        );
-                        diagnostics.push(diagnostic);
+                        ));
+                    }
+                    if !unknown_codes.is_empty() {
+                        diagnostics.push(Diagnostic::new(
+                            DiagnosticKind {
+                                body: format!(
+                                    "Type ignore directive has unknown codes: {}",
+                                    unknown_codes.iter().map(|code| code.to_string()).join(", ")
+                                ),
+                                error_code: ErrorCode::GeneralTypeError,
+                            },
+                            directive.range(),
+                        ));
                     }
                 }
             }
@@ -179,4 +178,13 @@ pub(crate) fn check_type_ignore(
 
     ignored_diagnostics.sort_unstable();
     ignored_diagnostics
+}
+
+pub fn collect_rule_codes(rules: impl IntoIterator<Item = ErrorCode>) -> String {
+    rules
+        .into_iter()
+        .map(|rule| rule.to_string())
+        .sorted_unstable()
+        .dedup()
+        .join(", ")
 }
