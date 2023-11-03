@@ -42,8 +42,8 @@ unicode-width = { version = "0.1.11" }
 rustpython-ast = { version = "0.3.0", features = [
     "all-nodes-with-ranges",
     "location",
-    "malachite-bigint",
-    "fold",
+    # "malachite-bigint",
+    # "fold",
     "rustpython-literal",
     "constant-optimization",
     "visitor",
@@ -52,7 +52,7 @@ rustpython-parser = { version = "0.3.0", features = [
     "full-lexer",
     "serde",
     "location",
-    "malachite-bigint",
+    # "malachite-bigint",
     "all-nodes-with-ranges",
 ] }
 rustpython-parser-vendored = { version = "0.3.0", features = ["serde"] }

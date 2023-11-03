@@ -2,8 +2,8 @@ pub use code_selector::ErrorCodeSelector;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+mod check;
 pub mod checker;
-mod checkers;
 pub mod code_selector;
 pub mod directives;
 pub mod fs;

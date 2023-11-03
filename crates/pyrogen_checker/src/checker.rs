@@ -15,9 +15,9 @@ use pyrogen_python_ast::{AsMode, PySourceType};
 use pyrogen_python_index::Indexer;
 use pyrogen_source_file::{Locator, SourceFileBuilder};
 
-use crate::checkers::filesystem::check_file_path;
-use crate::checkers::type_ignore::check_type_ignore;
-use crate::checkers::typecheck::check_ast;
+use crate::check::filesystem::check_file_path;
+use crate::check::type_ignore::check_type_ignore;
+use crate::check::typecheck::check_ast;
 use crate::message::Message;
 use crate::registry::{AsErrorCode, Diagnostic, DiagnosticKind, ErrorCode};
 use crate::settings::code_table::MessageKind;
@@ -44,17 +44,6 @@ impl<T> CheckerResult<T> {
     }
 }
 
-pub type FixTable = FxHashMap<ErrorCode, usize>;
-
-pub struct FixerResult<'a> {
-    /// The result returned by the linter, after applying any fixes.
-    pub result: CheckerResult<(Vec<Message>, Option<ImportMap>)>,
-    /// The resulting source code, after applying any fixes.
-    pub transformed: Cow<'a, SourceKind>,
-    /// The number of fixes applied for each [`Rule`].
-    pub fixed: FixTable,
-}
-
 /// Generate `Diagnostic`s from the source code contents at the
 /// given `Path`.
 #[allow(clippy::too_many_arguments)]
@@ -66,7 +55,7 @@ pub fn check_path(
     indexer: &Indexer,
     noqa_mapping: &TypeIgnoreMapping,
     settings: &CheckerSettings,
-    noqa: flags::TypeIgnore,
+    respect_type_ignore: flags::TypeIgnore,
     source_kind: &SourceKind,
     source_type: PySourceType,
 ) -> CheckerResult<(Vec<Diagnostic>, Option<ImportMap>)> {
@@ -93,7 +82,7 @@ pub fn check_path(
                 indexer,
                 noqa_mapping,
                 settings,
-                noqa,
+                respect_type_ignore,
                 path,
                 package,
                 source_type,
@@ -145,8 +134,8 @@ pub fn check_path(
         }
     };
 
-    // Enforce `noqa` directives.
-    if (noqa.into() && !diagnostics.is_empty())
+    // Enforce `type: ignore` directives.
+    if (respect_type_ignore.into() && !diagnostics.is_empty())
         || settings
             .table
             .iter_enabled()
@@ -161,7 +150,7 @@ pub fn check_path(
             error.is_none(),
             settings,
         );
-        if noqa.into() {
+        if respect_type_ignore.into() {
             for index in ignored.iter().rev() {
                 diagnostics.swap_remove(*index);
             }
@@ -265,13 +254,4 @@ fn diagnostics_to_messages(
             Message::from_diagnostic(diagnostic, file.deref().clone(), noqa_offset, kind)
         })
         .collect()
-}
-
-fn collect_rule_codes(rules: impl IntoIterator<Item = ErrorCode>) -> String {
-    rules
-        .into_iter()
-        .map(|rule| rule.to_string())
-        .sorted_unstable()
-        .dedup()
-        .join(", ")
 }

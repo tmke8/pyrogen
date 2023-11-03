@@ -257,7 +257,7 @@ pub(crate) enum FileExemption {
     /// The file is exempt from all rules.
     All,
     /// The file is exempt from the given rules.
-    Codes(Vec<&'static str>),
+    Codes(Vec<ErrorCode>),
 }
 
 impl FileExemption {
@@ -269,7 +269,7 @@ impl FileExemption {
         path: &Path,
         locator: &Locator,
     ) -> Option<Self> {
-        let mut exempt_codes: Vec<&'static str> = vec![];
+        let mut exempt_codes: Vec<ErrorCode> = vec![];
 
         for range in comment_ranges {
             match ParsedFileExemption::try_extract(&contents[*range]) {
@@ -277,7 +277,7 @@ impl FileExemption {
                     #[allow(deprecated)]
                     let line = locator.compute_line_index(range.start());
                     let path_display = relativize_path(path);
-                    warn!("Invalid `# type: ignore` directive at {path_display}:{line}: {err}");
+                    warn!("Invalid file-wide `# type: ignore` directive at {path_display}:{line}: {err}");
                 }
                 Ok(Some(exemption)) => match exemption {
                     ParsedFileExemption::All => {
@@ -287,7 +287,7 @@ impl FileExemption {
                         exempt_codes.extend(codes.into_iter().filter_map(|code| {
                                 if let Ok(error_code) = ErrorCode::from_str(code)
                                 {
-                                    Some(error_code.to_str())
+                                    Some(error_code)
                                 } else {
                                     #[allow(deprecated)]
                                     let line = locator.compute_line_index(range.start());
@@ -369,7 +369,7 @@ pub(crate) struct TypeIgnoreLine<'a> {
     /// The noqa directive.
     pub(crate) directive: Directive<'a>,
     /// The codes that are ignored by the directive.
-    pub(crate) matches: Vec<&'static str>,
+    pub(crate) matches: Vec<ErrorCode>,
 }
 
 impl Ranged for TypeIgnoreLine<'_> {
@@ -398,7 +398,7 @@ impl<'a> TypeIgnores<'a> {
                     #[allow(deprecated)]
                     let line = locator.compute_line_index(range.start());
                     let path_display = relativize_path(path);
-                    warn!("Invalid `# noqa` directive on {path_display}:{line}: {err}");
+                    warn!("Invalid `# type: ignore` directive on {path_display}:{line}: {err}");
                 }
                 Ok(Some(directive)) => {
                     // noqa comments are guaranteed to be single line.
