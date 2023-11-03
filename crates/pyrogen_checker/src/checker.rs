@@ -1,9 +1,6 @@
-use std::borrow::Cow;
 use std::ops::Deref;
 use std::path::Path;
 
-use itertools::Itertools;
-use rustc_hash::FxHashMap;
 use rustpython_ast::text_size::{TextLen, TextRange};
 use rustpython_ast::TextSize;
 use rustpython_parser::ast::Ranged;
