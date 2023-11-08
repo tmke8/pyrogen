@@ -41,7 +41,6 @@ result-like = "0.4.6"
 rustc-hash = { workspace = true }
 rustpython-ast = { workspace = true }
 rustpython-parser = { workspace = true }
-similar = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
 unicode-width = { workspace = true }

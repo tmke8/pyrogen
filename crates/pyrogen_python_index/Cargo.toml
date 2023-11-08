@@ -11,7 +11,7 @@ rust-version.workspace = true
 [dependencies]
 pyrogen_python_trivia = { path = "../pyrogen_python_trivia" }
 
-pyrogen_python_ast = { path = "../pyrogen_python_ast" }
+# pyrogen_python_ast = { path = "../pyrogen_python_ast" }
 pyrogen_source_file = { path = "../pyrogen_source_file" }
 
 rustpython-parser = { workspace = true }

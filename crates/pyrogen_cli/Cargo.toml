@@ -46,7 +46,6 @@ rustpython-parser-vendored = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 shellexpand = { workspace = true }
-similar = { workspace = true }
 thiserror = { workspace = true }
 wild = { version = "2.2.0" }
 
